@@ -32,7 +32,7 @@ O problema não é falta de dados — é falta de **antecipação**. Os dois sin
 | 1 | Problema & Diagnóstico | Pagamento do cliente depende do resultado de uma safra futura, não da saúde financeira atual dele | Motor de due diligence que cruza dados cadastrais/jurídicos com os dois fatores de receita do produtor: clima e preço de commodity |
 | 2 | Público-Alvo/Beneficiários | Quem decide crédito de insumo e quem é avaliado | Portal Gestor (time comercial/crédito da Krill Tech) + Portal Contratante (produtor/agroindústria cliente) |
 | 3 | Lógica de Funcionamento | Fluxo repetível que antecipa risco antes da colheita | Pipeline: coleta cadastral/jurídica → índice climático → índice de commodity/plantação → score consolidado → relatório |
-| 4 | Score & Rating | Decisão de crédito de insumo hoje não pondera risco de safra futura | Score 0–1000 + rating A–D, com peso explícito para exposição climática e de preço |
+| 4 | Score & Rating | Decisão de crédito de insumo hoje não pondera risco de safra futura | Score 0–1000 + rating A–F, com peso explícito para exposição climática e de preço |
 | 5 | Matriz de Red Flags | Sinais de risco de receita futura dispersos (clima, preço, jurídico, fiscal) | Matriz unificada: jurídicos/fiscais/ambientais + os dois novos módulos (clima e commodity/plantação) |
 | 6 | Recomendação de Decisão Operacional | Limite de crédito de insumo hoje ignora se a próxima safra é de alto risco | Motor ajusta limite/condições de pagamento conforme exposição projetada da safra |
 | 7 | Monitoramento Contínuo (Early Warning) | Descoberta tardia — só quando o produtor já não pagou | Alerta automático quando piora o índice climático da região ou o preço da commodity do cliente despenca, *antes* do vencimento |
