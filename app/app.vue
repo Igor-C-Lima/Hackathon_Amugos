@@ -27,6 +27,16 @@ const tokensFieldLedger = [
   ['--ui-color-primary-900', '#102315'],
   ['--ui-color-primary-950', '#0a170e'],
   ['--ui-primary', '#2d6a3f'],
+  /*
+   * success/warning/error/info por padrão apontam pro tom -500 puro de cada escala Tailwind
+   * (green/yellow/blue/red) — verde e amarelo nessa faixa são claros demais pro fundo creme
+   * (--ui-bg), texto quase ilegível; azul e vermelho já ficam ok mas um tom mais escuro
+   * melhora a leitura também. Mesma técnica de override do --ui-primary acima.
+   */
+  ['--ui-success', '#166534'],
+  ['--ui-warning', '#92400e'],
+  ['--ui-error', '#b91c1c'],
+  ['--ui-info', '#2563eb'],
   ['--ui-text-dimmed', '#8ab587'],
   ['--ui-text-muted', '#3c4a39'],
   ['--ui-text-toned', '#395837'],

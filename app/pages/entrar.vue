@@ -35,7 +35,10 @@ function entrar() {
   <div class="campo-fundo flex min-h-screen items-center justify-center p-4">
     <GridTalhao />
 
-    <div class="flex w-full max-w-3xl flex-col items-center gap-8 lg:flex-row lg:justify-center">
+    <!-- `relative`: sem isso o SVG absoluto do GridTalhao (posicionado) pinta por cima deste
+         bloco (não-posicionado) na ordem de stacking do CSS, mesmo vindo antes no DOM — mesmo
+         truque que .cabecalho já usa na landing (app/pages/index.vue). -->
+    <div class="relative flex w-full max-w-3xl flex-col items-center gap-8 lg:flex-row lg:justify-center">
       <UCard class="w-full max-w-md shrink-0">
         <template #header>
           <div class="flex items-center gap-3">
@@ -64,9 +67,11 @@ function entrar() {
             <URadioGroup v-model="perfil" :items="perfis" value-key="value" />
           </UFormField>
 
-          <UButton type="submit" block size="lg" trailing-icon="i-lucide-arrow-right">
-            Entrar
-          </UButton>
+          <div class="flex justify-center">
+            <UButton type="submit" trailing-icon="i-lucide-arrow-right">
+              Entrar
+            </UButton>
+          </div>
         </form>
 
         <template #footer>
