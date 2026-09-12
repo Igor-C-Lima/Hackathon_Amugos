@@ -9,6 +9,9 @@ dist
 # Node dependencies
 node_modules
 
+# Projeto usa pnpm — não versionar lockfile do npm
+package-lock.json
+
 # Logs
 logs
 *.log
