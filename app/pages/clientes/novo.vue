@@ -20,7 +20,7 @@ const form = reactive({
   capitalSocial: 0,
   culturaPredominante: 'soja' as Cultura,
   barterAtivo: false,
-  tipoGarantia: '' as TipoGarantia | '',
+  tipoGarantia: 'nenhuma' as TipoGarantia | 'nenhuma',
   garantiaAtiva: true,
   valorEmAberto: 0,
   codigoCAR: '',
@@ -35,7 +35,7 @@ const culturas = (Object.keys(rotuloCultura) as Cultura[]).map(value => ({
 }))
 
 const garantias = [
-  { label: 'Sem garantia registrada', value: '' },
+  { label: 'Sem garantia registrada', value: 'nenhuma' as const },
   ...(Object.keys(rotuloGarantia) as TipoGarantia[]).map(value => ({
     label: rotuloGarantia[value],
     value,
@@ -122,7 +122,7 @@ function salvar() {
     capitalSocial: form.capitalSocial,
     culturaPredominante: form.culturaPredominante,
     barterAtivo: form.barterAtivo,
-    garantia: form.tipoGarantia
+    garantia: form.tipoGarantia !== 'nenhuma'
       ? { tipo: form.tipoGarantia, ativo: form.garantiaAtiva }
       : undefined,
     valorEmAberto: form.valorEmAberto,
@@ -271,7 +271,7 @@ function salvar() {
 
             <div class="flex flex-col justify-end gap-3 pb-1">
               <UCheckbox
-                v-if="form.tipoGarantia"
+                v-if="form.tipoGarantia !== 'nenhuma'"
                 v-model="form.garantiaAtiva"
                 label="Garantia ativa"
               />

@@ -2,6 +2,26 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/*
+ * Design system do portal — DESIGN.md ("The Field Ledger").
+ * A landing (app/pages/index.vue) já é a implementação de referência; aqui o mesmo
+ * sistema é aplicado através dos tokens semânticos do Nuxt UI, não copiando a folha
+ * de estilo da landing — é o jeito correto de recolorir dashboards/tabelas/formulários
+ * feitos de componentes UDashboard*/U*, em vez de reescrever cada página.
+ *
+ * Os valores (--ui-bg, --ui-text, --ui-color-primary-*, --ui-radius etc.) são
+ * definidos em app/app.vue via style inline no <html>, não aqui — testado que a
+ * declaração deste arquivo perdia pra folha de estilo do @nuxt/ui mesmo com
+ * !important (a stylesheet do módulo bloqueia introspecção via CSSOM nesta sandbox,
+ * não deu pra confirmar a causa exata). Style inline no elemento raiz resolve de
+ * forma garantida. Ver o comentário em app.vue antes de mexer na paleta do portal.
+ */
+
+/* "Do balance display and headline text" — aplicado a todo título do portal, não só à landing. */
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
 /* RF-12: exportação em PDF usa o diálogo de impressão do navegador. */
 @media print {
   /* Painéis do dashboard rolam internamente; na impressão precisam fluir por todas as páginas. */

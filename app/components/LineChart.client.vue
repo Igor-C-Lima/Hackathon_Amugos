@@ -26,8 +26,8 @@ const data = computed(() => ({
     {
       label: props.label,
       data: props.values,
-      borderColor: 'oklch(0.65 0.17 155)',
-      backgroundColor: 'oklch(0.65 0.17 155 / 0.12)',
+      borderColor: '#2d6a3f',
+      backgroundColor: 'rgba(45, 106, 63, 0.12)',
       borderWidth: 2,
       fill: true,
       tension: 0.3,
@@ -37,7 +37,7 @@ const data = computed(() => ({
       pointBackgroundColor: props.labels.map((_, i) =>
         props.destaqueDe !== undefined && i >= props.destaqueDe
           ? 'oklch(0.65 0.2 30)'
-          : 'oklch(0.65 0.17 155)',
+          : '#2d6a3f',
       ),
     },
   ],
@@ -49,7 +49,7 @@ const options = {
   plugins: { legend: { display: false } },
   scales: {
     x: { grid: { display: false } },
-    y: { grid: { color: 'rgba(128,128,128,0.15)' } },
+    y: { grid: { color: 'rgba(27, 42, 26, 0.14)' } },
   },
 }
 </script>
