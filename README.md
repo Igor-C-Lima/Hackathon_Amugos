@@ -35,6 +35,28 @@ O sistema é dividido em dois portais:
 - [ESLint](https://eslint.org/) (`@nuxt/eslint`)
 - [pnpm](https://pnpm.io/) — gerenciador de pacotes
 
+## 🔌 APIs utilizadas
+
+### APIs reais
+
+- **[Receita Federal](https://www.gov.br/receitafederal/)** — validação de CNPJ e dados cadastrais da empresa cliente.
+- **[AgroAPI (Embrapa)](https://api.cnptia.embrapa.br/)** — dados agrícolas (a "mágica" do projeto: cruza clima, solo e produtividade por região/cultura).
+- **[BrasilAPI](https://brasilapi.com.br/)** — dados públicos brasileiros complementares (CEP, feriados, etc.).
+- **Municípios (IBGE)** — dados de localização/município para vincular o cliente à sua região agrícola.
+- **ZARC** — Zoneamento Agrícola de Risco Climático (MAPA), usado para o calendário de plantio/colheita por cultura e região.
+- **[watsonx (IBM)](https://www.ibm.com/watsonx)** — agente de IA usado para gerar o relatório/análise (`relatorioLLM`) a partir dos dados cruzados do cliente.
+
+### Dados mockados (sintéticos no MVP)
+
+- **DataJud (CNJ)** — processos judiciais (recuperação judicial, protesto).
+- **SICAR** — Cadastro Ambiental Rural (embargo ambiental).
+- **ONI (NOAA)** — índice El Niño/La Niña, histórico climático.
+- **CONAB** — produtividade histórica por região/cultura.
+- **INMET** — clima observado.
+- **CEPEA/ESALQ** — preço de commodities agrícolas.
+
+> As chaves de API (LLM, CEPEA, etc.) nunca são expostas no client — todas as chamadas a APIs externas passam por Cloud Functions.
+
 ## 📋 Pré-requisitos
 
 - [Node.js](https://nodejs.org/) (versão compatível com Nuxt 4)
