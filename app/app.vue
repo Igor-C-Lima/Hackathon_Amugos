@@ -94,6 +94,26 @@ useHead({
     class: computed(() => (altoContraste.value ? 'alto-contraste' : '')),
   },
 })
+
+/*
+ * useHead's htmlAttrs.style só é aplicado de fato na primeira renderização: mudanças
+ * reativas depois disso (trocar contraste, aumentar/diminuir texto) não repatcham o
+ * atributo style do <html> (`bug confirmado ao vivo: localStorage atualiza, o valor
+ * em tela não). O `class` no mesmo useHead reage normalmente — o problema é específico
+ * do style. Contorna aplicando os tokens direto no elemento depois do mount, sem
+ * depender do patch reativo do Unhead; o useHead acima continua garantindo que o SSR
+ * já nasce com o estilo certo (evita flash de tema errado no primeiro paint).
+ */
+if (import.meta.client) {
+  watchEffect(() => {
+    const raiz = document.documentElement
+    const tokens = altoContraste.value ? tokensAltoContraste : tokensFieldLedger
+    for (const [prop, val] of tokens) {
+      raiz.style.setProperty(prop, val, 'important')
+    }
+    raiz.style.setProperty('font-size', `${escalaTexto.value}%`, 'important')
+  })
+}
 </script>
 
 <template>
