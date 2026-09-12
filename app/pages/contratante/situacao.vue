@@ -7,10 +7,10 @@ import type { Rating, TipoRedFlag } from '~~/types/firestore'
 useHead({ title: 'Minha situação — Portal do Contratante' })
 
 const contratante = useContratante()
-const dossie = computed(() => buscarDossie(contratante.value))
+const { dossie, pending } = useDossie(contratante)
 
-watchEffect(() => {
-  if (!dossie.value) navigateTo('/contratante')
+watch([pending, dossie], ([carregando, d]) => {
+  if (!carregando && !d) navigateTo('/contratante')
 })
 
 const explicacaoRating: Record<Rating, string> = {

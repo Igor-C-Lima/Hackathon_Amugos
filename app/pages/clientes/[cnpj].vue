@@ -6,26 +6,34 @@ import { marked } from 'marked'
 definePageMeta({ layout: 'gestor' })
 
 const route = useRoute()
-const dossie = buscarDossie(route.params.cnpj as string)
+const cnpj = route.params.cnpj as string
+const { dossie, pending } = useDossie(cnpj)
 
-if (!dossie) {
-  throw createError({ statusCode: 404, statusMessage: 'Cliente não encontrado', fatal: true })
-}
+// A busca é assíncrona agora (Firestore) — só dá pra saber que não existe depois que
+// a consulta termina e ainda assim não veio nada. `showError`, não `createError` direto:
+// isso roda depois da renderização inicial, não durante ela.
+watch([pending, dossie], ([carregando, d]) => {
+  if (!carregando && !d) {
+    showError(createError({ statusCode: 404, statusMessage: 'Cliente não encontrado', fatal: true }))
+  }
+})
 
-const {
-  cliente,
-  climatico,
-  commodity,
-  breakdown,
-  historico,
-  janelaColheita,
-  fimColheita,
-  proximoVencimento,
-  cobrancas,
-  imovel,
-} = dossie!
+// Os campos abaixo só existem quando dossie carrega — o template inteiro fica atrás de
+// um `v-if="dossie"`, então o `!` é seguro: se `cliente` está sendo lido, `dossie` já existe.
+const cliente = computed(() => dossie.value!.cliente)
+const climatico = computed(() => dossie.value!.climatico)
+const commodity = computed(() => dossie.value!.commodity)
+const breakdown = computed(() => dossie.value!.breakdown)
+const historico = computed(() => dossie.value!.historico)
+const janelaColheita = computed(() => dossie.value!.janelaColheita)
+const fimColheita = computed(() => dossie.value!.fimColheita)
+const proximoVencimento = computed(() => dossie.value!.proximoVencimento)
+const cobrancas = computed(() => dossie.value!.cobrancas)
+const imovel = computed(() => dossie.value!.imovel)
 
-useHead({ title: `${cliente.razaoSocial} — Portal Gestor` })
+useHead({
+  title: computed(() => dossie.value ? `${dossie.value.cliente.razaoSocial} — Portal Gestor` : 'Ficha do cliente'),
+})
 
 const toast = useToast()
 const perfil = usePerfil()
@@ -39,7 +47,7 @@ const {
 
 const usarRelatorioMock = ref(true)
 
-const resumoExecutivo = computed(() => relatorio.value || cliente.relatorioLLM)
+const resumoExecutivo = computed(() => relatorio.value || cliente.value.relatorioLLM)
 const resumoExecutivoHtml = computed(() => marked.parse(resumoExecutivo.value ?? '', { async: false }))
 
 /**
@@ -50,38 +58,47 @@ const resumoExecutivoHtml = computed(() => marked.parse(resumoExecutivo.value ??
  */
 const fallbackSintetico = computed(() => ({
   receitaFederal: {
-    razaoSocial: cliente.razaoSocial,
+    razaoSocial: cliente.value.razaoSocial,
     situacao: 'ATIVA',
-    cnaeDescricao: cliente.cnae,
-    dataAbertura: cliente.dataAbertura.toISOString().slice(0, 10),
+    cnaeDescricao: cliente.value.cnae,
+    dataAbertura: cliente.value.dataAbertura.toISOString().slice(0, 10),
     socios: [] as string[],
-    municipio: cliente.municipio,
-    uf: cliente.uf,
+    municipio: cliente.value.municipio,
+    uf: cliente.value.uf,
   },
   dataJud: {
-    processos: cliente.redFlags
+    processos: cliente.value.redFlags
       .filter(f => f.tipo === 'rj' || f.tipo === 'protesto')
       .map(f => ({ tipo: rotuloRedFlag[f.tipo], status: f.severidade })),
   },
   sicar: {
-    areaHectares: imovel.areaTotalHa,
-    regular: imovel.situacaoCAR === 'ativo',
-    embargos: cliente.redFlags.filter(f => f.tipo === 'embargo_ambiental').length,
+    areaHectares: imovel.value.areaTotalHa,
+    regular: imovel.value.situacaoCAR === 'ativo',
+    embargos: cliente.value.redFlags.filter(f => f.tipo === 'embargo_ambiental').length,
   },
 }))
 
-const emRJ = computed(() => cliente.redFlags.some(f => f.tipo === 'rj'))
+const emRJ = computed(() => cliente.value.redFlags.some(f => f.tipo === 'rj'))
 
 const fatores = computed(() => [
-  { rotulo: 'Jurídico / fiscal / cadastral', peso: breakdown.pesoJuridicoFiscal, cor: 'neutral' as const },
-  { rotulo: 'Risco climático (ONI × CONAB)', peso: breakdown.pesoClimatico, cor: 'warning' as const },
-  { rotulo: 'Exposição a preço de commodity', peso: breakdown.pesoCommodity, cor: 'info' as const },
+  { rotulo: 'Jurídico / fiscal / cadastral', peso: breakdown.value.pesoJuridicoFiscal, cor: 'neutral' as const },
+  { rotulo: 'Risco climático (ONI × CONAB)', peso: breakdown.value.pesoClimatico, cor: 'warning' as const },
+  { rotulo: 'Exposição a preço de commodity', peso: breakdown.value.pesoCommodity, cor: 'info' as const },
 ])
 
 /** RF-29: a fatura vence antes de o cliente terminar de colher e comercializar? */
-const vencimentoAntesDaColheita = computed(() => !!fimColheita && proximoVencimento < fimColheita)
+const vencimentoAntesDaColheita = computed(() => !!fimColheita.value && proximoVencimento.value < fimColheita.value)
 
-const limite = ref(cliente.limiteCreditoRecomendado ?? 0)
+// O limite parte da recomendação do motor assim que o cliente carrega, mas não deve
+// voltar a pular se o Firestore reemitir o mesmo doc por um motivo qualquer — só
+// preenche na primeira vez que os dados chegam (`once`, Vue 3.4+). Também semeia
+// direto do valor já resolvido: numa navegação SSR (URL direta/reload) `dossie` já
+// chega pronto na montagem, e um `watch` sem `immediate` nunca dispara nesse caso —
+// só reage a mudanças depois do setup.
+const limite = ref(dossie.value?.cliente.limiteCreditoRecomendado ?? 0)
+watch(dossie, (d) => {
+  if (d) limite.value = d.cliente.limiteCreditoRecomendado ?? 0
+}, { once: true })
 
 /**
  * Exportação em PDF pelo diálogo de impressão do navegador — sem dependência extra.
@@ -104,29 +121,47 @@ async function imprimir(recorte: 'ficha' | 'cobranca') {
 }
 
 const totalNegociado = computed(() =>
-  cobrancas.reduce((s, c) => s + (c.valor ?? 0), 0),
+  cobrancas.value.reduce((s, c) => s + (c.valor ?? 0), 0),
 )
 
 /** RF-28: CAR fora de "ativo" compromete a garantia sobre a área e pode travar crédito rural. */
-const carIrregular = computed(() => imovel.situacaoCAR !== 'ativo')
+const carIrregular = computed(() => imovel.value.situacaoCAR !== 'ativo')
 
 const proporcaoPlantada = computed(() =>
-  Math.round((imovel.areaPlantadaHa / imovel.areaTotalHa) * 100),
+  Math.round((imovel.value.areaPlantadaHa / imovel.value.areaTotalHa) * 100),
 )
 
-function registrarDecisao() {
-  // RF-11: decisão manual com registro de auditoria — persistência fica para o Firestore.
-  toast.add({
-    title: 'Decisão registrada',
-    description: `Limite de ${brl(limite.value)} aprovado para ${cliente.razaoSocial}.`,
-    color: 'success',
-    icon: 'i-lucide-check',
-  })
+const salvando = ref(false)
+
+async function registrarDecisao() {
+  // RF-11: decisão manual — grava direto no doc do cliente (sem trilha de auditoria
+  // separada, fora do MVP por decisão de escopo já registrada em PRODUCT.md).
+  salvando.value = true
+  try {
+    await registrarDecisaoCredito(cnpj, limite.value, cliente.value.condicoesPagamentoRecomendadas)
+    toast.add({
+      title: 'Decisão registrada',
+      description: `Limite de ${brl(limite.value)} aprovado para ${cliente.value.razaoSocial}.`,
+      color: 'success',
+      icon: 'i-lucide-check',
+    })
+  }
+  catch {
+    toast.add({
+      title: 'Falha ao registrar',
+      description: 'Não foi possível salvar a decisão no banco. Tente de novo.',
+      color: 'error',
+      icon: 'i-lucide-triangle-alert',
+    })
+  }
+  finally {
+    salvando.value = false
+  }
 }
 </script>
 
 <template>
-  <UDashboardPanel id="ficha">
+  <UDashboardPanel v-if="dossie" id="ficha">
     <template #header>
       <UDashboardNavbar :title="cliente.nomeFantasia ?? cliente.razaoSocial">
         <template #leading>
@@ -706,11 +741,32 @@ function registrarDecisao() {
               <p>{{ cliente.condicoesPagamentoRecomendadas }}</p>
             </div>
 
-            <UButton icon="i-lucide-check" @click="registrarDecisao">
+            <UButton icon="i-lucide-check" :loading="salvando" @click="registrarDecisao">
               Registrar decisão
             </UButton>
           </div>
         </UCard>
+      </div>
+    </template>
+  </UDashboardPanel>
+
+  <UDashboardPanel v-else id="ficha-carregando">
+    <template #header>
+      <UDashboardNavbar title="Carregando...">
+        <template #leading>
+          <UButton
+            to="/clientes"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            aria-label="Voltar para clientes"
+          />
+        </template>
+      </UDashboardNavbar>
+    </template>
+    <template #body>
+      <div class="flex items-center justify-center py-24 text-muted">
+        <UIcon v-if="pending" name="i-lucide-loader-circle" class="size-6 animate-spin" />
       </div>
     </template>
   </UDashboardPanel>

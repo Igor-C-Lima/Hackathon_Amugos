@@ -1,41 +1,22 @@
 import type {
   Alerta,
-  Cliente,
+  ClienteDossie,
   Cultura,
   HistoricoScore,
-  IndiceExposicaoCommodity,
-  IndiceRiscoClimatico,
-  ImovelRural,
-  InteracaoCobranca,
-  ScoreBreakdown,
 } from '~~/types/firestore'
+import { ratingDoScore } from './dominio.ts'
+import { faseONIVigente } from './scoring.ts'
 
 /**
- * Dados sintéticos do MVP (DEVELOPMENT_PLAN.md §8: SICAR, ZARC, PGFN e TST são
- * representados com dados plausíveis no hackathon). Substituir por Firestore/Cloud Functions.
- * Datas são literais fixos de propósito — `new Date()` aqui quebraria a hidratação SSR.
+ * Dados de semente — usados só por `scripts/seed-firestore.mjs` pra popular o Firestore
+ * uma vez. Depois disso a fonte real é o banco (app/composables/useCarteira.ts); nenhuma
+ * página importa `carteira`/`alertas` daqui mais. Datas são literais fixos de propósito —
+ * `new Date()` aqui produziria semente diferente a cada execução do script.
+ *
+ * Importa `ratingDoScore`/`faseONIVigente` explicitamente (em vez de confiar no
+ * auto-import do Nuxt) porque o script de seed roda este arquivo fora do Nuxt, com
+ * `tsx` puro — sem o transform que injeta os auto-imports.
  */
-
-/** Fase ONI vigente publicada pelo NOAA CPC — a mesma para toda a carteira (RF-19). */
-export const faseONIVigente = 'nino_forte' as const
-
-export interface ClienteDossie {
-  cliente: Cliente
-  climatico: IndiceRiscoClimatico
-  commodity: IndiceExposicaoCommodity
-  breakdown: ScoreBreakdown
-  historico: HistoricoScore[]
-  /** Janela de colheita da cultura no município, via ZARC (RF-29). */
-  janelaColheita: string
-  /** Fim da janela de colheita. Ausente quando a produção é contínua (pecuária). */
-  fimColheita?: Date
-  /** Vencimento da fatura de insumo mais próxima (RF-29). */
-  proximoVencimento: Date
-  /** Tentativas de cobrança já registradas. Vazio = cliente nunca entrou em recuperação. */
-  cobrancas: InteracaoCobranca[]
-  /** Imóvel rural declarado no CAR/SICAR (RF-28). */
-  imovel: ImovelRural
-}
 
 const historico = (scores: number[]): HistoricoScore[] =>
   scores.map((score, i) => ({
@@ -681,171 +662,6 @@ export const carteira: ClienteDossie[] = [
     },
   },
 ]
-
-export interface NovoClienteForm {
-  cnpj: string
-  razaoSocial: string
-  nomeFantasia?: string
-  cnae: string
-  municipio: string
-  uf: string
-  dataAbertura: Date
-  capitalSocial: number
-  culturaPredominante: Cultura
-  barterAtivo: boolean
-  garantia?: Cliente['garantia']
-  valorEmAberto: number
-  codigoCAR: string
-  areaTotalHa: number
-  areaPlantadaHa: number
-  situacaoCAR: SituacaoCAR
-}
-
-/** Perde-se ao recarregar a página: pontos que um cliente novo não tem por não ter trilha de pagamento conosco. */
-const PENALIDADE_SEM_HISTORICO = 120
-
-/**
- * Monta o dossiê completo de um cliente recém-cadastrado e o coloca na carteira.
- *
- * ponytail: o score sai de uma fórmula explícita aqui porque o motor real (RF-19 a RF-27)
- * ainda não existe — os índices climático e de commodity são herdados de um cliente da mesma
- * cultura, que é o proxy regional mais próximo que a carteira sintética oferece. Trocar pelo
- * pipeline de verdade assim que ele responder. O cadastro também só vive em memória: sem
- * Firestore, um reload perde o cliente.
- */
-export function cadastrarCliente(form: NovoClienteForm): ClienteDossie {
-  const hoje = new Date()
-  const referencia = carteira.find(d => d.cliente.culturaPredominante === form.culturaPredominante)
-
-  const climatico: IndiceRiscoClimatico = referencia
-    ? { ...referencia.climatico, clienteId: form.cnpj, calculadoEm: hoje }
-    : {
-        clienteId: form.cnpj,
-        regiao: `${form.municipio} / ${form.uf}`,
-        cultura: form.culturaPredominante,
-        faseONI: faseONIVigente,
-        quedaProdutividadeHistorica: 8,
-        indiceRisco: 40,
-        calculadoEm: hoje,
-      }
-
-  const commodity: IndiceExposicaoCommodity = referencia
-    ? { ...referencia.commodity, clienteId: form.cnpj, calculadoEm: hoje }
-    : {
-        clienteId: form.cnpj,
-        cultura: form.culturaPredominante,
-        precoAtual: 0,
-        variacao6Meses: 0,
-        tendencia: 'estavel',
-        indiceExposicao: 40,
-        calculadoEm: hoje,
-      }
-
-  const pesoJuridicoFiscal = 45
-  const pesoClimatico = 30
-  const pesoCommodity = 25
-
-  const score = Math.max(
-    0,
-    Math.round(
-      1000
-      - PENALIDADE_SEM_HISTORICO
-      - climatico.indiceRisco * (pesoClimatico / 100) * 4
-      - commodity.indiceExposicao * (pesoCommodity / 100) * 4
-      - (form.situacaoCAR === 'ativo' ? 0 : 80),
-    ),
-  )
-  const rating = ratingDoScore(score)
-
-  const cliente: Cliente = {
-    cnpj: form.cnpj,
-    razaoSocial: form.razaoSocial,
-    nomeFantasia: form.nomeFantasia,
-    cnae: form.cnae,
-    municipio: form.municipio,
-    uf: form.uf,
-    dataAbertura: form.dataAbertura,
-    capitalSocial: form.capitalSocial,
-    culturaPredominante: form.culturaPredominante,
-    garantia: form.garantia,
-    barterAtivo: form.barterAtivo,
-    scoreAtual: score,
-    ratingAtual: rating,
-    limiteCreditoRecomendado: Math.round((score / 1000) * form.capitalSocial),
-    condicoesPagamentoRecomendadas:
-      rating === 'A' || rating === 'B'
-        ? 'Pagamento em 120 dias, revisar após a primeira safra com histórico'
-        : 'Pagamento em 60 dias até formar histórico de pagamento',
-    valorEmAberto: form.valorEmAberto,
-    redFlags:
-      form.situacaoCAR === 'ativo'
-        ? []
-        : [{
-            tipo: 'embargo_ambiental' as const,
-            descricao: `CAR ${form.codigoCAR} com situação "${form.situacaoCAR}" no SICAR.`,
-            severidade: 'alta' as const,
-            detectadoEm: hoje,
-          }],
-    relatorioLLM:
-      'Cliente recém-cadastrado, ainda sem histórico de pagamento com a Krill Tech. '
-      + `O score parte da exposição de safra da cultura declarada (${form.culturaPredominante}) e será `
-      + 'recalculado após a primeira safra. Gere o relatório completo pelo agente de LLM.',
-    criadoEm: hoje,
-    atualizadoEm: hoje,
-  }
-
-  const dossie: ClienteDossie = {
-    cliente,
-    climatico,
-    commodity,
-    breakdown: {
-      clienteId: form.cnpj,
-      pesoJuridicoFiscal,
-      pesoClimatico,
-      pesoCommodity,
-      scoreFinal: score,
-      ratingFinal: rating,
-      calculadoEm: hoje,
-    },
-    historico: [{ score, rating, data: hoje }],
-    janelaColheita: referencia?.janelaColheita ?? 'a definir',
-    fimColheita: referencia?.fimColheita,
-    proximoVencimento: new Date(hoje.getFullYear(), hoje.getMonth() + 4, hoje.getDate()),
-    cobrancas: [],
-    imovel: {
-      clienteId: form.cnpj,
-      codigoCAR: form.codigoCAR,
-      areaTotalHa: form.areaTotalHa,
-      areaPlantadaHa: form.areaPlantadaHa,
-      reservaLegalHa: Math.round(form.areaTotalHa * 0.2),
-      situacaoCAR: form.situacaoCAR,
-      consultadoEm: hoje,
-    },
-  }
-
-  carteira.push(dossie)
-  return dossie
-}
-
-/** Recalcula a cada chamada: a carteira cresce quando um cliente é cadastrado em memória. */
-export const listarClientes = () => carteira.map(d => d.cliente)
-
-export const buscarDossie = (cnpj: string) => carteira.find(d => d.cliente.cnpj === cnpj)
-
-/**
- * RF-07: por que este cliente entrou no ranking de cobrança — o evento mais recente
- * do feed de alertas, caindo para a red flag mais nova quando não há alerta.
- */
-export function motivoRanking(cnpj: string): string {
-  const alerta = alertas
-    .filter(a => a.clienteId === cnpj)
-    .sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime())[0]
-  if (alerta) return alerta.descricao
-
-  const flag = [...(buscarDossie(cnpj)?.cliente.redFlags ?? [])]
-    .sort((a, b) => b.detectadoEm.getTime() - a.detectadoEm.getTime())[0]
-  return flag?.descricao ?? 'Sem evento novo — entra no ranking pelo tamanho da exposição em aberto.'
-}
 
 /** Série de preço CEPEA/ESALQ sintética, para o gráfico com a janela de safra destacada (RF-30). */
 export const mesesPreco = ['ago/25', 'set/25', 'out/25', 'nov/25', 'dez/25', 'jan/26']

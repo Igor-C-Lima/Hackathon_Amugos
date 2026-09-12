@@ -5,10 +5,13 @@ useHead({ title: 'Entrar — Portal do Contratante' })
 const contratante = useContratante()
 const documento = ref('')
 const erro = ref('')
+const verificando = ref(false)
 
-function entrar() {
+async function entrar() {
   const digitos = documento.value.replace(/\D/g, '')
-  const encontrado = listarClientes().find(c => c.cnpj === digitos)
+  verificando.value = true
+  const encontrado = await existeCliente(digitos)
+  verificando.value = false
 
   if (!encontrado) {
     erro.value = 'Não encontramos esse CNPJ/CPF no cadastro da Krill Tech. Confira os números e tente de novo.'
@@ -16,7 +19,7 @@ function entrar() {
   }
 
   erro.value = ''
-  contratante.value = encontrado.cnpj
+  contratante.value = digitos
   navigateTo('/contratante/situacao')
 }
 </script>
@@ -56,7 +59,7 @@ function entrar() {
             />
           </UFormField>
 
-          <UButton type="submit" block size="lg" trailing-icon="i-lucide-arrow-right">
+          <UButton type="submit" block size="lg" trailing-icon="i-lucide-arrow-right" :loading="verificando">
             Ver minha situação
           </UButton>
         </form>

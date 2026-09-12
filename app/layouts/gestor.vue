@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const perfil = usePerfil()
-const naoLidos = computed(() => alertas.filter(a => !a.lido).length)
+const alertasFeed = useAlertasFeed()
+const naoLidos = computed(() => (alertasFeed.value ?? []).filter(a => !a.lido).length)
 
 // Duas seções distintas: "Crédito" decide a entrada, "Recuperação" atua sobre o que já está em aberto.
 // Alertas alimenta as duas, por isso fica no grupo compartilhado (PAGES.md §Portal Gestor).
