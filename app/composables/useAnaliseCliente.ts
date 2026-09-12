@@ -91,7 +91,7 @@ export function useAnaliseCliente() {
     }
   }
 
-  async function gerarRelatorio(cnpj: string, usarMock = true, fallback?: FallbackColetores) {
+  async function gerarRelatorio(cnpj: string, usarMock = true, fallback?: FallbackColetores, contextoAdicional?: string) {
     carregandoRelatorio.value = true
     erroRelatorio.value = ''
     relatorio.value = ''
@@ -101,7 +101,7 @@ export function useAnaliseCliente() {
     try {
       const resposta = await $fetch<{ relatorio: string | null, erro: string | null }>(
         endpoint,
-        { method: 'POST', body: usarMock ? { cnpj } : { cnpj, fallback } },
+        { method: 'POST', body: usarMock ? { cnpj } : { cnpj, fallback, contextoAdicional } },
       )
 
       if (resposta.erro) {

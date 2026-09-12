@@ -78,6 +78,29 @@ const fallbackSintetico = computed(() => ({
   },
 }))
 
+/**
+ * Score, rating, red flags, risco climático e exposição a commodity já
+ * existem no dossiê sintético (carteira mock), mas não fazem parte do que
+ * os coletores reais (Receita Federal/Agritec) sabem buscar — isso é
+ * trabalho do motor de score (RF-19 a RF-27), que ainda não existe.
+ * Manda esses dados como contexto adicional pro agente, pra o relatório
+ * sair completo em vez de dizer "não informado" pra cliente mockado.
+ */
+const contextoAdicionalSintetico = computed(() => {
+  const listaRedFlags = cliente.value.redFlags.length
+    ? cliente.value.redFlags.map(f => `${rotuloRedFlag[f.tipo]} (severidade ${f.severidade}): ${f.descricao}`).join('; ')
+    : 'nenhuma red flag identificada'
+
+  return [
+    `Score de crédito: ${cliente.value.scoreAtual}/1000, rating ${cliente.value.ratingAtual}.`,
+    `Red flags identificadas: ${listaRedFlags}.`,
+    `Risco climático: fase ONI ${rotuloFaseONI[climatico.value.faseONI]}, índice de risco ${climatico.value.indiceRisco}/100, queda histórica de produtividade de ${climatico.value.quedaProdutividadeHistorica}% na região (${climatico.value.regiao}).`,
+    `Exposição a preço de commodity: ${rotuloCultura[commodity.value.cultura]} a ${brl(commodity.value.precoAtual)}, variação de ${pct(commodity.value.variacao6Meses)} em 6 meses, tendência de ${commodity.value.tendencia}, índice de exposição ${commodity.value.indiceExposicao}/100.`,
+    `Situação da safra: janela de colheita em ${janelaColheita.value}, próximo vencimento de fatura em ${dataBR(proximoVencimento.value)}.`,
+    `Limite de crédito recomendado pelo motor interno: ${brl(cliente.value.limiteCreditoRecomendado ?? 0)}, condições sugeridas: ${cliente.value.condicoesPagamentoRecomendadas ?? 'não definidas'}. Valor em aberto atual: ${brl(cliente.value.valorEmAberto)}.`,
+  ].join('\n\n')
+})
+
 const emRJ = computed(() => cliente.value.redFlags.some(f => f.tipo === 'rj'))
 
 const fatores = computed(() => [
@@ -571,7 +594,7 @@ async function registrarDecisao() {
                   variant="subtle"
                   size="sm"
                   :loading="carregandoRelatorio"
-                  @click="gerarRelatorio(cliente.cnpj, usarRelatorioMock, fallbackSintetico)"
+                  @click="gerarRelatorio(cliente.cnpj, usarRelatorioMock, fallbackSintetico, contextoAdicionalSintetico)"
                 >
                   Gerar relatório
                 </UButton>
