@@ -3,7 +3,7 @@ export default defineEventHandler(async (event) => {
 
   const cnpjLimpo = validarCnpj(cnpj)
 
-  const { texto: contextoEnviado, dados: dadosColetados } = await montarContexto(cnpjLimpo)
+  const { texto: contextoEnviado, dados: dadosColetados, diagnostico } = await montarContexto(cnpjLimpo)
 
-  return { dadosColetados, contextoEnviado }
+  return { dadosColetados, contextoEnviado, diagnostico }
 })

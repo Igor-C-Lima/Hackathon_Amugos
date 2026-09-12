@@ -1,3 +1,9 @@
+export interface DiagnosticoFonte {
+  fonte: string
+  sucesso: boolean
+  erro?: string
+}
+
 export interface DadosColetados {
   receitaFederal: DadosReceitaFederal | null
   dataJud: DadosDataJud | null
@@ -9,6 +15,29 @@ export interface DadosColetados {
 export interface ContextoMontado {
   texto: string
   dados: DadosColetados
+  diagnostico: DiagnosticoFonte[]
+}
+
+function extrairMensagemErro(error: any): string {
+  return error?.data?.statusMessage ?? error?.data?.message ?? error?.statusMessage ?? error?.message ?? 'Erro desconhecido'
+}
+
+async function coletar<T>(fonte: string, promessa: Promise<T>): Promise<{ dados: T | null, diagnostico: DiagnosticoFonte }> {
+  try {
+    const dados = await promessa
+    console.log(`[coleta] ${fonte}: sucesso —`, JSON.stringify(dados))
+    return { dados, diagnostico: { fonte, sucesso: true } }
+  }
+  catch (error: any) {
+    const mensagem = extrairMensagemErro(error)
+    console.error(`[coleta] ${fonte}: falhou —`, mensagem)
+    return { dados: null, diagnostico: { fonte, sucesso: false, erro: mensagem } }
+  }
+}
+
+function diagnosticoPulado(fonte: string, motivo: string): { dados: null, diagnostico: DiagnosticoFonte } {
+  console.log(`[coleta] ${fonte}: pulado —`, motivo)
+  return { dados: null, diagnostico: { fonte, sucesso: false, erro: motivo } }
 }
 
 function montarBlocoCadastral(dados: DadosReceitaFederal | null): string {
@@ -53,23 +82,27 @@ function montarBlocoZoneamento(zarc: DadosZarc | null): string {
 }
 
 export async function montarContexto(cnpj: string): Promise<ContextoMontado> {
-  const [receitaFederalResult, dataJudResult, sicarResult] = await Promise.allSettled([
-    consultarReceitaFederal(cnpj),
-    consultarDataJud(cnpj),
-    consultarSicar(cnpj),
+  const [receitaFederalColetado, dataJudColetado, sicarColetado] = await Promise.all([
+    coletar('Receita Federal', consultarReceitaFederal(cnpj)),
+    coletar('DataJud', consultarDataJud(cnpj)),
+    coletar('SICAR', consultarSicar(cnpj)),
   ])
 
-  const dadosReceitaFederal = receitaFederalResult.status === 'fulfilled' ? receitaFederalResult.value : null
-  const dadosDataJud = dataJudResult.status === 'fulfilled' ? dataJudResult.value : null
-  const dadosSicar = sicarResult.status === 'fulfilled' ? sicarResult.value : null
+  const dadosReceitaFederal = receitaFederalColetado.dados
+  const dadosDataJud = dataJudColetado.dados
+  const dadosSicar = sicarColetado.dados
 
-  const dadosMunicipio = dadosReceitaFederal
-    ? await consultarMunicipio({ municipio: dadosReceitaFederal.municipio, uf: dadosReceitaFederal.uf })
-    : null
+  const municipioColetado = dadosReceitaFederal
+    ? await coletar('Município (Agritec)', consultarMunicipio({ municipio: dadosReceitaFederal.municipio, uf: dadosReceitaFederal.uf }))
+    : diagnosticoPulado('Município (Agritec)', 'Dados da Receita Federal indisponíveis — não foi possível determinar o município')
 
-  const dadosZarc = dadosMunicipio
-    ? await consultarZarc({ codigoIBGE: dadosMunicipio.codigoIBGE })
-    : null
+  const dadosMunicipio = municipioColetado.dados
+
+  const zarcColetado = dadosMunicipio
+    ? await coletar('ZARC (Agritec)', consultarZarc({ codigoIBGE: dadosMunicipio.codigoIBGE }))
+    : diagnosticoPulado('ZARC (Agritec)', 'Município indisponível — zoneamento não pôde ser consultado')
+
+  const dadosZarc = zarcColetado.dados
 
   const texto = [
     montarBlocoCadastral(dadosReceitaFederal),
@@ -87,5 +120,12 @@ export async function montarContexto(cnpj: string): Promise<ContextoMontado> {
       municipio: dadosMunicipio,
       zarc: dadosZarc,
     },
+    diagnostico: [
+      receitaFederalColetado.diagnostico,
+      dataJudColetado.diagnostico,
+      sicarColetado.diagnostico,
+      municipioColetado.diagnostico,
+      zarcColetado.diagnostico,
+    ],
   }
 }

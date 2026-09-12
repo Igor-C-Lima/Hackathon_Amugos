@@ -3,11 +3,20 @@ interface DadosColetados {
   receitaFederal: { razaoSocial: string, situacao: string, cnaeDescricao: string, dataAbertura: string, socios: string[] } | null
   dataJud: { processos: Array<{ tipo: string, status: string }> } | null
   sicar: { areaHectares: number, regular: boolean, embargos: number } | null
+  municipio: { codigoIBGE: number, latitude: number, longitude: number } | null
+  zarc: { riscoPercentual: number, mesInicio: string, mesFim: string } | null
+}
+
+interface DiagnosticoFonte {
+  fonte: string
+  sucesso: boolean
+  erro?: string
 }
 
 const cnpj = ref('')
 const dadosColetados = ref<DadosColetados | null>(null)
 const contextoEnviado = ref('')
+const diagnostico = ref<DiagnosticoFonte[]>([])
 const erro = ref('')
 const carregando = ref(false)
 
@@ -16,15 +25,17 @@ async function buscarDados() {
   erro.value = ''
   dadosColetados.value = null
   contextoEnviado.value = ''
+  diagnostico.value = []
 
   try {
-    const resposta = await $fetch<{ dadosColetados: DadosColetados, contextoEnviado: string }>('/api/dados-cliente', {
+    const resposta = await $fetch<{ dadosColetados: DadosColetados, contextoEnviado: string, diagnostico: DiagnosticoFonte[] }>('/api/dados-cliente', {
       method: 'POST',
       body: { cnpj: cnpj.value },
     })
 
     dadosColetados.value = resposta.dadosColetados
     contextoEnviado.value = resposta.contextoEnviado
+    diagnostico.value = resposta.diagnostico
   }
   catch (e: any) {
     erro.value = e?.data?.statusMessage ?? e?.message ?? 'Erro ao buscar dados'
@@ -57,6 +68,18 @@ function irParaRelatorio() {
     <p v-if="erro" style="color: red; margin-top: 1rem;">
       {{ erro }}
     </p>
+
+    <template v-if="diagnostico.length > 0">
+      <h2 style="margin-top: 1.5rem;">
+        Diagnóstico por fonte
+      </h2>
+      <ul style="list-style: none; padding: 0;">
+        <li v-for="item in diagnostico" :key="item.fonte">
+          {{ item.sucesso ? '✅' : '❌' }} <strong>{{ item.fonte }}</strong>
+          <span v-if="!item.sucesso" style="color: red;"> — {{ item.erro }}</span>
+        </li>
+      </ul>
+    </template>
 
     <template v-if="dadosColetados">
       <h2 style="margin-top: 1.5rem;">
@@ -97,6 +120,19 @@ function irParaRelatorio() {
         <p><strong>Área:</strong> {{ dadosColetados.sicar.areaHectares }}ha</p>
         <p><strong>Regularidade no CAR:</strong> {{ dadosColetados.sicar.regular ? 'Regular' : 'Com pendências' }}</p>
         <p><strong>Embargos ambientais:</strong> {{ dadosColetados.sicar.embargos }}</p>
+      </template>
+      <p v-else>
+        Não disponível.
+      </p>
+
+      <h2 style="margin-top: 1.5rem;">
+        Zoneamento agrícola
+      </h2>
+      <template v-if="dadosColetados.municipio && dadosColetados.zarc">
+        <p><strong>Município (código IBGE):</strong> {{ dadosColetados.municipio.codigoIBGE }}</p>
+        <p><strong>Coordenadas:</strong> {{ dadosColetados.municipio.latitude }}, {{ dadosColetados.municipio.longitude }}</p>
+        <p><strong>Risco de plantio (soja):</strong> {{ dadosColetados.zarc.riscoPercentual }}%</p>
+        <p><strong>Janela recomendada:</strong> {{ dadosColetados.zarc.mesInicio }} a {{ dadosColetados.zarc.mesFim }}</p>
       </template>
       <p v-else>
         Não disponível.
