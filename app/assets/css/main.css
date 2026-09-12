@@ -22,6 +22,23 @@ h1, h2, h3 {
   text-wrap: balance;
 }
 
+/*
+ * Alto contraste (widget de acessibilidade, app/components/PainelAcessibilidade.vue): a landing
+ * (app/pages/index.vue) roda com paleta própria via CSS vars escopadas em ".safrascore", fora dos
+ * tokens --ui-* do resto do portal — por isso precisa da sua própria sobrescrita aqui. O seletor
+ * com "html" na frente é de propósito: soma um seletor de tipo à especificidade para vencer as
+ * vars locais definidas em ".safrascore" no <style scoped> da página, sem precisar de !important.
+ */
+html.alto-contraste .safrascore {
+  --creme: #000000;
+  --creme-fundo: #0d0d0d;
+  --tinta: #ffffff;
+  --tinta-suave: #ffffff;
+  --verde: #ffd60a;
+  --verde-escuro: #ffd60a;
+  --borda: #ffd60a;
+}
+
 /* RF-12: exportação em PDF usa o diálogo de impressão do navegador. */
 @media print {
   /* Painéis do dashboard rolam internamente; na impressão precisam fluir por todas as páginas. */

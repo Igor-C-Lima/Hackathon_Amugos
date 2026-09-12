@@ -102,18 +102,18 @@ const etapas = [
 
       <main class="hero">
         <div class="hero-texto">
-          <h1 class="titulo entrada" style="--atraso: 0s">
+          <h1 v-fade-scroll class="titulo entrada" style="--atraso: 0s">
             O risco da safra, lido antes da colheita.
           </h1>
 
-          <p class="chamada entrada" style="--atraso: 0.1s">
+          <p v-fade-scroll class="chamada entrada" style="--atraso: 0.1s">
             O pagamento do fornecedor de insumo não depende da saúde financeira do produtor — depende da
             safra que ele ainda vai colher e vender. O SafraScore monitora os dois sinais que decidem
             isso, clima e preço da commodity, e transforma em score, red flag e recomendação de limite
             antes do vencimento.
           </p>
 
-          <div class="acoes entrada" style="--atraso: 0.2s">
+          <div v-fade-scroll class="acoes entrada" style="--atraso: 0.2s">
             <NuxtLink to="/entrar" class="botao botao-solido">
               Portal do analista
             </NuxtLink>
@@ -125,18 +125,18 @@ const etapas = [
 
         <!-- Decorativa: o texto já diz tudo o que a foto mostra. Fundo só existe a partir do
              breakpoint em que a coluna aparece, então o mobile nunca baixa esse arquivo. -->
-        <div class="hero-foto entrada" style="--atraso: 0.3s" aria-hidden="true" />
+        <div v-fade-scroll class="hero-foto entrada" style="--atraso: 0.3s" aria-hidden="true" />
       </main>
     </div>
 
     <section class="secao">
       <div class="limite">
-        <h2 class="titulo-secao">
+        <h2 v-fade-scroll class="titulo-secao">
           O que decide se o cliente paga não está no balanço dele.
         </h2>
 
         <div class="sinais">
-          <article v-for="sinal in sinais" :key="sinal.titulo" class="sinal">
+          <article v-for="sinal in sinais" :key="sinal.titulo" v-fade-scroll class="sinal">
             <h3>{{ sinal.titulo }}</h3>
             <p class="fonte">
               {{ sinal.fonte }}
@@ -149,12 +149,12 @@ const etapas = [
 
     <section class="secao secao-alt">
       <div class="limite">
-        <h2 class="titulo-secao">
+        <h2 v-fade-scroll class="titulo-secao">
           Da base pública ao alerta, antes da fatura vencer.
         </h2>
 
         <ol class="etapas">
-          <li v-for="etapa in etapas" :key="etapa.n">
+          <li v-for="etapa in etapas" :key="etapa.n" v-fade-scroll>
             <span class="numero">{{ etapa.n }}</span>
             <h3>{{ etapa.titulo }}</h3>
             <p>{{ etapa.texto }}</p>
@@ -164,7 +164,7 @@ const etapas = [
     </section>
 
     <footer class="rodape">
-      <div class="limite rodape-conteudo">
+      <div v-fade-scroll class="limite rodape-conteudo">
         <div>
           <p class="marca marca-rodape">
             <span class="semente" aria-hidden="true" />

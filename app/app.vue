@@ -44,10 +44,55 @@ const tokensFieldLedger = [
   ['--ui-border-inverted', '#1b2a1a'],
 ] as const
 
-const estiloFieldLedger = tokensFieldLedger.map(([prop, val]) => `${prop}: ${val} !important`).join('; ')
+/**
+ * Paleta de alto contraste (preto/amarelo, o par clássico de acessibilidade): usada no lugar
+ * dos tokens acima quando o widget de acessibilidade está ativo. Mesma técnica de style inline
+ * — ver comentário acima sobre por que não dá pra fazer isso só em main.css.
+ */
+const tokensAltoContraste = [
+  ['--ui-radius', '3px'],
+  ['--ui-color-primary-50', '#3a3200'],
+  ['--ui-color-primary-100', '#4d4200'],
+  ['--ui-color-primary-200', '#665800'],
+  ['--ui-color-primary-300', '#8a7700'],
+  ['--ui-color-primary-400', '#b39900'],
+  ['--ui-color-primary-500', '#ffd60a'],
+  ['--ui-color-primary-600', '#ffd60a'],
+  ['--ui-color-primary-700', '#ffe14d'],
+  ['--ui-color-primary-800', '#fff0a3'],
+  ['--ui-color-primary-900', '#fff8d6'],
+  ['--ui-color-primary-950', '#fffbe8'],
+  ['--ui-primary', '#ffd60a'],
+  ['--ui-text-dimmed', '#d9d9d9'],
+  ['--ui-text-muted', '#ffffff'],
+  ['--ui-text-toned', '#ffffff'],
+  ['--ui-text', '#ffffff'],
+  ['--ui-text-highlighted', '#ffffff'],
+  ['--ui-text-inverted', '#000000'],
+  ['--ui-bg', '#000000'],
+  ['--ui-bg-muted', '#0d0d0d'],
+  ['--ui-bg-elevated', '#141414'],
+  ['--ui-bg-accented', '#1f1f1f'],
+  ['--ui-bg-inverted', '#ffffff'],
+  ['--ui-border', '#ffd60a'],
+  ['--ui-border-muted', '#8a7700'],
+  ['--ui-border-accented', '#ffd60a'],
+  ['--ui-border-inverted', '#ffffff'],
+] as const
+
+const { altoContraste, escalaTexto } = useAcessibilidade()
+
+const estiloHtml = computed(() => {
+  const tokens = altoContraste.value ? tokensAltoContraste : tokensFieldLedger
+  const cores = tokens.map(([prop, val]) => `${prop}: ${val} !important`).join('; ')
+  return `${cores}; font-size: ${escalaTexto.value}% !important`
+})
 
 useHead({
-  htmlAttrs: { style: estiloFieldLedger },
+  htmlAttrs: {
+    style: estiloHtml,
+    class: computed(() => (altoContraste.value ? 'alto-contraste' : '')),
+  },
 })
 </script>
 
@@ -57,5 +102,6 @@ useHead({
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <PainelAcessibilidade />
   </UApp>
 </template>
