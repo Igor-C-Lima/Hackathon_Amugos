@@ -39,7 +39,7 @@ const links = computed(() => [
           <UIcon name="i-lucide-sprout" class="size-6 shrink-0 text-primary" />
           <div v-if="!collapsed" class="min-w-0">
             <p class="truncate text-sm font-semibold">
-              Krill Tech
+              SafraScore
             </p>
             <p class="truncate text-xs text-muted">
               Portal Gestor

@@ -70,7 +70,7 @@ function entrar() {
               12.345.678/0001-90
             </button>
           </p>
-          <ULink to="/" class="text-sm text-muted hover:text-primary">
+          <ULink to="/entrar" class="text-sm text-muted hover:text-primary">
             Sou do time da Krill Tech
           </ULink>
         </div>

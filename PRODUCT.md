@@ -49,7 +49,9 @@ Os dois juntos formam o "Índice de Risco de Receita da Safra" e ponderam o scor
 
 ## Brand Commitments
 
-Sem nome de produto/marca definido ainda para o sistema em si (distinto do nome do cliente "Krill Tech") — decisão em aberto.
+O produto se chama **SafraScore** — distinto de **Krill Tech**, que é a fornecedora de insumo que o usa. A landing pública e o Portal Gestor levam a marca SafraScore; o Portal Contratante segue assinando como Krill Tech, porque é a Krill Tech que o produtor conhece como contraparte.
+
+A landing (`app/pages/index.vue`) fixa a própria paleta, fora do color-mode do portal: creme `#f5f3ea`, tinta `#1b2a1a`, verde `#2d6a3f`. O fundo é uma trama de pontos sobre um grid de plantação — duas famílias de linhas de plantio cruzadas, com os pontos de fuga fora da tela para que a malha se leia como talhão, não como leque.
 
 ## Evidence on Hand
 
