@@ -1,10 +1,10 @@
 export default defineEventHandler(async (event) => {
-  const { cnpj } = await readBody<{ cnpj?: string }>(event)
+  const { cnpj, fallback } = await readBody<{ cnpj?: string, fallback?: FallbackColetores }>(event)
 
   const cnpjLimpo = validarCnpj(cnpj)
 
   try {
-    const { texto: contextoEnviado, dados: dadosColetados } = await montarContexto(cnpjLimpo)
+    const { texto: contextoEnviado, dados: dadosColetados } = await montarContexto(cnpjLimpo, fallback)
     const relatorio = await chamarAgenteWatsonx(contextoEnviado)
 
     return { relatorio, dadosColetados, contextoEnviado, erro: null }

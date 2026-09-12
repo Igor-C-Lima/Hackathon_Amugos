@@ -2,22 +2,22 @@
 import type { Severidade } from '~~/types/firestore'
 
 // Página 6 — Feed de Alertas (RF-06, RF-23). Alimenta Crédito e Recuperação.
-// No MVP final isto vira listener do Firestore (< 2s, plano §7); aqui a lista é local.
+// Listener em tempo real do Firestore (useAlertasFeed → useCollection, < 2s, plano §7).
 definePageMeta({ layout: 'gestor' })
 useHead({ title: 'Alertas — Portal Gestor' })
 
-const lista = ref(alertas.map(a => ({ ...a })))
+const lista = useAlertasFeed()
 
 const filtro = ref<Severidade | 'todas'>('todas')
 const severidades = ['todas', 'critica', 'alta', 'media', 'baixa'] as const
 
 const visiveis = computed(() =>
-  [...lista.value]
+  [...(lista.value ?? [])]
     .filter(a => filtro.value === 'todas' || a.severidade === filtro.value)
     .sort((a, b) => Number(a.lido) - Number(b.lido) || b.criadoEm.getTime() - a.criadoEm.getTime()),
 )
 
-const naoLidos = computed(() => lista.value.filter(a => !a.lido).length)
+const naoLidos = computed(() => (lista.value ?? []).filter(a => !a.lido).length)
 
 const quando = (d: Date) =>
   `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
@@ -33,7 +33,7 @@ const quando = (d: Date) =>
             variant="ghost"
             icon="i-lucide-check-check"
             :disabled="!naoLidos"
-            @click="lista.forEach(a => a.lido = true)"
+            @click="(lista ?? []).forEach(a => marcarAlertaLido(a.id, true))"
           >
             Marcar todos como lidos
           </UButton>
@@ -42,84 +42,99 @@ const quando = (d: Date) =>
     </template>
 
     <template #body>
-      <div class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <UFieldGroup>
-            <UButton
-              v-for="s in severidades"
-              :key="s"
-              :color="filtro === s ? 'primary' : 'neutral'"
-              :variant="filtro === s ? 'solid' : 'outline'"
-              size="sm"
-              @click="filtro = s"
-            >
-              {{ s }}
-            </UButton>
-          </UFieldGroup>
-          <p class="text-sm text-muted">
-            {{ naoLidos }} não lido(s) de {{ lista.length }}
-          </p>
-        </div>
-
-        <div v-if="visiveis.length" class="space-y-3">
-          <UCard
-            v-for="alerta in visiveis"
-            :key="`${alerta.clienteId}-${alerta.criadoEm.getTime()}`"
-            :class="alerta.lido ? 'opacity-60' : ''"
-          >
-            <div class="flex items-start gap-4">
-              <UIcon
-                :name="iconeRedFlag[alerta.tipo]"
-                :class="[
-                  'mt-0.5 size-5 shrink-0',
-                  alerta.severidade === 'critica' ? 'text-error'
-                  : alerta.severidade === 'alta' ? 'text-warning' : 'text-muted',
-                ]"
-              />
-
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <ULink
-                    :to="`/clientes/${alerta.clienteId}`"
-                    class="font-medium text-highlighted hover:text-primary"
-                  >
-                    {{ alerta.clienteNome }}
-                  </ULink>
-                  <UBadge :color="corSeveridade[alerta.severidade]" variant="subtle" size="sm">
-                    {{ alerta.severidade }}
-                  </UBadge>
-                  <UBadge color="neutral" variant="outline" size="sm">
-                    {{ categoriaRedFlag[alerta.tipo] }}
-                  </UBadge>
-                  <span v-if="!alerta.lido" class="size-2 rounded-full bg-primary" aria-label="Não lido" />
-                </div>
-                <p class="mt-1 text-sm text-muted">
-                  {{ alerta.descricao }}
-                </p>
-                <p class="mt-1 text-xs text-dimmed">
-                  {{ quando(alerta.criadoEm) }}
-                </p>
-              </div>
-
+      <!--
+        ClientOnly: useAlertasFeed é uma query com orderBy, e o vuefire desta versão avisa
+        "Could not get the path of the data source" ao tentar serializar isso pro SSR — o
+        cliente hidrata com uma lista vazia, o servidor mandou a lista real, e o mismatch
+        deixava a seção inteira sem renderizar nada (nem os cards, nem o vazio). Sem SSR
+        aqui, sem esse problema — troca é razoável pra tela de dado ao vivo, não indexável.
+      -->
+      <ClientOnly>
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <UFieldGroup>
               <UButton
-                :icon="alerta.lido ? 'i-lucide-mail' : 'i-lucide-mail-open'"
-                color="neutral"
-                variant="ghost"
+                v-for="s in severidades"
+                :key="s"
+                :color="filtro === s ? 'primary' : 'neutral'"
+                :variant="filtro === s ? 'solid' : 'outline'"
                 size="sm"
-                :aria-label="alerta.lido ? 'Marcar como não lido' : 'Marcar como lido'"
-                @click="alerta.lido = !alerta.lido"
-              />
-            </div>
-          </UCard>
+                @click="filtro = s"
+              >
+                {{ s }}
+              </UButton>
+            </UFieldGroup>
+            <p class="text-sm text-muted">
+              {{ naoLidos }} não lido(s) de {{ lista.length }}
+            </p>
+          </div>
+
+          <div v-if="visiveis.length" class="space-y-3">
+            <UCard
+              v-for="alerta in visiveis"
+              :key="alerta.id"
+              :class="alerta.lido ? 'opacity-60' : ''"
+            >
+              <div class="flex items-start gap-4">
+                <UIcon
+                  :name="iconeRedFlag[alerta.tipo]"
+                  :class="[
+                    'mt-0.5 size-5 shrink-0',
+                    alerta.severidade === 'critica' ? 'text-error'
+                    : alerta.severidade === 'alta' ? 'text-warning' : 'text-muted',
+                  ]"
+                />
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <ULink
+                      :to="`/clientes/${alerta.clienteId}`"
+                      class="font-medium text-highlighted hover:text-primary"
+                    >
+                      {{ alerta.clienteNome }}
+                    </ULink>
+                    <UBadge :color="corSeveridade[alerta.severidade]" variant="subtle" size="sm">
+                      {{ alerta.severidade }}
+                    </UBadge>
+                    <UBadge color="neutral" variant="outline" size="sm">
+                      {{ categoriaRedFlag[alerta.tipo] }}
+                    </UBadge>
+                    <span v-if="!alerta.lido" class="size-2 rounded-full bg-primary" aria-label="Não lido" />
+                  </div>
+                  <p class="mt-1 text-sm text-muted">
+                    {{ alerta.descricao }}
+                  </p>
+                  <p class="mt-1 text-xs text-dimmed">
+                    {{ quando(alerta.criadoEm) }}
+                  </p>
+                </div>
+
+                <UButton
+                  :icon="alerta.lido ? 'i-lucide-mail' : 'i-lucide-mail-open'"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  :aria-label="alerta.lido ? 'Marcar como não lido' : 'Marcar como lido'"
+                  @click="marcarAlertaLido(alerta.id, !alerta.lido)"
+                />
+              </div>
+            </UCard>
+          </div>
+
+          <UEmpty
+            v-else
+            icon="i-lucide-bell-off"
+            title="Nenhum alerta nesta severidade"
+            description="Ajuste o filtro para ver os demais alertas da carteira."
+          />
         </div>
 
-        <UEmpty
-          v-else
-          icon="i-lucide-bell-off"
-          title="Nenhum alerta nesta severidade"
-          description="Ajuste o filtro para ver os demais alertas da carteira."
-        />
-      </div>
+        <template #fallback>
+          <div class="flex items-center justify-center py-24 text-muted">
+            <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin" />
+          </div>
+        </template>
+      </ClientOnly>
     </template>
   </UDashboardPanel>
 </template>

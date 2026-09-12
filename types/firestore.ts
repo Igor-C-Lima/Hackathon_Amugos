@@ -141,3 +141,47 @@ export interface ScoreBreakdown {
   ratingFinal: Rating
   calculadoEm: Date
 }
+
+/**
+ * Visão consolidada de um cliente pra tela — Cliente + os quatro índices/registros
+ * que hoje vivem embutidos no mesmo documento `clientes/{cnpj}` no Firestore
+ * (climatico/commodity/breakdown/imovel), mais as duas subcoleções (historico/cobrancas).
+ * `useDossie` (app/composables/useCarteira.ts) monta isso a partir do Firestore;
+ * app/utils/mock.ts monta o mesmo formato a partir dos dados de semente.
+ */
+export interface ClienteDossie {
+  cliente: Cliente
+  climatico: IndiceRiscoClimatico
+  commodity: IndiceExposicaoCommodity
+  breakdown: ScoreBreakdown
+  historico: HistoricoScore[]
+  /** Janela de colheita da cultura no município, via ZARC (RF-29). */
+  janelaColheita: string
+  /** Fim da janela de colheita. Ausente quando a produção é contínua (pecuária). */
+  fimColheita?: Date
+  /** Vencimento da fatura de insumo mais próxima (RF-29). */
+  proximoVencimento: Date
+  /** Tentativas de cobrança já registradas. Vazio = cliente nunca entrou em recuperação. */
+  cobrancas: InteracaoCobranca[]
+  /** Imóvel rural declarado no CAR/SICAR (RF-28). */
+  imovel: ImovelRural
+}
+
+export interface NovoClienteForm {
+  cnpj: string
+  razaoSocial: string
+  nomeFantasia?: string
+  cnae: string
+  municipio: string
+  uf: string
+  dataAbertura: Date
+  capitalSocial: number
+  culturaPredominante: Cultura
+  barterAtivo: boolean
+  garantia?: Cliente['garantia']
+  valorEmAberto: number
+  codigoCAR: string
+  areaTotalHa: number
+  areaPlantadaHa: number
+  situacaoCAR: SituacaoCAR
+}

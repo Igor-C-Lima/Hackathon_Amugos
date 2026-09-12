@@ -1,26 +1,29 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Cliente } from '~~/types/firestore'
 
 // Página 2 — Painel de Clientes / Home (RF-01, RF-02, RF-03).
 definePageMeta({ layout: 'gestor' })
 useHead({ title: 'Clientes — Portal Gestor' })
 
+// O doc de cada cliente já traz climatico/commodity embutidos (useCarteira.ts) —
+// não precisa de uma segunda consulta por linha pra montar a coluna de exposição.
+const listaClientes = useListaClientes()
+
 const busca = ref('')
-const todos = computed(listarClientes)
 
 const filtrados = computed(() => {
+  const todos = listaClientes.value ?? []
   const termo = busca.value.trim().toLowerCase().replace(/\D/g, '')
   const texto = busca.value.trim().toLowerCase()
-  if (!texto) return todos.value
-  return todos.value.filter(c =>
+  if (!texto) return todos
+  return todos.filter(c =>
     c.razaoSocial.toLowerCase().includes(texto)
     || c.nomeFantasia?.toLowerCase().includes(texto)
     || (termo.length > 0 && c.cnpj.includes(termo)),
   )
 })
 
-const colunas: TableColumn<Cliente>[] = [
+const colunas: TableColumn<typeof filtrados.value[number]>[] = [
   { accessorKey: 'razaoSocial', header: 'Cliente' },
   { accessorKey: 'municipio', header: 'Praça' },
   { accessorKey: 'culturaPredominante', header: 'Cultura' },
@@ -30,8 +33,6 @@ const colunas: TableColumn<Cliente>[] = [
   { accessorKey: 'redFlags', header: 'Red flags' },
   { accessorKey: 'limiteCreditoRecomendado', header: 'Limite sugerido' },
 ]
-
-const dossiePor = (cnpj: string) => buscarDossie(cnpj)!
 </script>
 
 <template>
@@ -59,7 +60,7 @@ const dossiePor = (cnpj: string) => buscarDossie(cnpj)!
             class="w-full max-w-sm"
           />
           <p class="text-sm text-muted">
-            {{ filtrados.length }} de {{ todos.length }} clientes
+            {{ filtrados.length }} de {{ (listaClientes ?? []).length }} clientes
           </p>
         </div>
 
@@ -100,11 +101,11 @@ const dossiePor = (cnpj: string) => buscarDossie(cnpj)!
             <div class="flex items-center gap-3 text-xs">
               <span class="flex items-center gap-1" title="Índice de risco climático">
                 <UIcon name="i-lucide-cloud-rain-wind" class="size-3.5 text-muted" />
-                {{ dossiePor(row.original.cnpj).climatico.indiceRisco }}
+                {{ row.original.climatico.indiceRisco }}
               </span>
               <span class="flex items-center gap-1" title="Índice de exposição a preço de commodity">
                 <UIcon name="i-lucide-trending-down" class="size-3.5 text-muted" />
-                {{ dossiePor(row.original.cnpj).commodity.indiceExposicao }}
+                {{ row.original.commodity.indiceExposicao }}
               </span>
             </div>
           </template>

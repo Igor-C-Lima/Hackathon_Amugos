@@ -96,50 +96,66 @@ const erroArea = computed(() =>
     : undefined,
 )
 
-function salvar() {
+const salvando = ref(false)
+
+async function salvar() {
   if (!podeSalvar.value) return
 
   const cnpj = form.cnpj.replace(/\D/g, '')
+  salvando.value = true
 
-  if (buscarDossie(cnpj)) {
+  try {
+    if (await existeCliente(cnpj)) {
+      toast.add({
+        title: 'Cliente já cadastrado',
+        description: 'Esse CNPJ já está na carteira.',
+        color: 'warning',
+        icon: 'i-lucide-triangle-alert',
+      })
+      return
+    }
+
+    const dossie = await cadastrarClienteNoBanco({
+      cnpj,
+      razaoSocial: form.razaoSocial.trim(),
+      nomeFantasia: form.nomeFantasia.trim() || undefined,
+      cnae: form.cnae.trim(),
+      municipio: form.municipio.trim(),
+      uf: form.uf.trim().toUpperCase(),
+      dataAbertura: form.dataAbertura ? new Date(form.dataAbertura) : new Date(),
+      capitalSocial: form.capitalSocial,
+      culturaPredominante: form.culturaPredominante,
+      barterAtivo: form.barterAtivo,
+      garantia: form.tipoGarantia !== 'nenhuma'
+        ? { tipo: form.tipoGarantia, ativo: form.garantiaAtiva }
+        : undefined,
+      valorEmAberto: form.valorEmAberto,
+      codigoCAR: form.codigoCAR.trim() || 'não informado',
+      areaTotalHa: form.areaTotalHa,
+      areaPlantadaHa: form.areaPlantadaHa,
+      situacaoCAR: form.situacaoCAR,
+    })
+
     toast.add({
-      title: 'Cliente já cadastrado',
-      description: 'Esse CNPJ já está na carteira.',
-      color: 'warning',
+      title: 'Cliente cadastrado',
+      description: `Score inicial ${dossie.cliente.scoreAtual} (rating ${dossie.cliente.ratingAtual}).`,
+      color: 'success',
+      icon: 'i-lucide-check',
+    })
+
+    navigateTo(`/clientes/${cnpj}`)
+  }
+  catch {
+    toast.add({
+      title: 'Falha ao cadastrar',
+      description: 'Não foi possível gravar o cliente no banco. Tente de novo.',
+      color: 'error',
       icon: 'i-lucide-triangle-alert',
     })
-    return
   }
-
-  const dossie = cadastrarCliente({
-    cnpj,
-    razaoSocial: form.razaoSocial.trim(),
-    nomeFantasia: form.nomeFantasia.trim() || undefined,
-    cnae: form.cnae.trim(),
-    municipio: form.municipio.trim(),
-    uf: form.uf.trim().toUpperCase(),
-    dataAbertura: form.dataAbertura ? new Date(form.dataAbertura) : new Date(),
-    capitalSocial: form.capitalSocial,
-    culturaPredominante: form.culturaPredominante,
-    barterAtivo: form.barterAtivo,
-    garantia: form.tipoGarantia !== 'nenhuma'
-      ? { tipo: form.tipoGarantia, ativo: form.garantiaAtiva }
-      : undefined,
-    valorEmAberto: form.valorEmAberto,
-    codigoCAR: form.codigoCAR.trim() || 'não informado',
-    areaTotalHa: form.areaTotalHa,
-    areaPlantadaHa: form.areaPlantadaHa,
-    situacaoCAR: form.situacaoCAR,
-  })
-
-  toast.add({
-    title: 'Cliente cadastrado',
-    description: `Score inicial ${dossie.cliente.scoreAtual} (rating ${dossie.cliente.ratingAtual}).`,
-    color: 'success',
-    icon: 'i-lucide-check',
-  })
-
-  navigateTo(`/clientes/${cnpj}`)
+  finally {
+    salvando.value = false
+  }
 }
 </script>
 
@@ -321,7 +337,7 @@ function salvar() {
             Ao salvar, o sistema calcula um score inicial a partir da exposição de safra da cultura
             declarada. Ele será recalculado quando houver histórico de pagamento.
           </p>
-          <UButton type="submit" size="lg" :disabled="!podeSalvar" icon="i-lucide-check">
+          <UButton type="submit" size="lg" :disabled="!podeSalvar" :loading="salvando" icon="i-lucide-check">
             Cadastrar e avaliar
           </UButton>
         </div>

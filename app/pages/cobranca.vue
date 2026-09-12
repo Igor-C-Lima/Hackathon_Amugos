@@ -5,6 +5,11 @@
 definePageMeta({ layout: 'gestor' })
 useHead({ title: 'Esteira de cobrança — Portal Gestor' })
 
+// Sem historico/cobrancas aqui — a fila só precisa do cadastro + red flags de cada
+// cliente e do feed de alertas, então `useListaClientes` (sem subcoleções) já basta.
+const listaClientes = useListaClientes()
+const alertasFeed = useAlertasFeed()
+
 /**
  * Proxy de perda esperada: probabilidade de não pagar × exposição.
  * ponytail: risco derivado do score (1 − score/1000); trocar pela PD real do motor quando existir.
@@ -12,17 +17,17 @@ useHead({ title: 'Esteira de cobrança — Portal Gestor' })
 const perdaEsperada = (score: number, valor: number) => Math.round((1 - score / 1000) * valor)
 
 const ranking = computed(() =>
-  carteira
-    .map(d => ({
-      dossie: d,
-      risco: 1 - d.cliente.scoreAtual / 1000,
-      perda: perdaEsperada(d.cliente.scoreAtual, d.cliente.valorEmAberto),
-      motivo: motivoRanking(d.cliente.cnpj),
+  (listaClientes.value ?? [])
+    .map(c => ({
+      dossie: { cliente: c },
+      risco: 1 - c.scoreAtual / 1000,
+      perda: perdaEsperada(c.scoreAtual, c.valorEmAberto),
+      motivo: motivoRanking(c.cnpj, alertasFeed.value ?? [], c.redFlags),
     }))
     .sort((a, b) => b.perda - a.perda),
 )
 
-const totalAberto = computed(() => carteira.reduce((s, d) => s + d.cliente.valorEmAberto, 0))
+const totalAberto = computed(() => (listaClientes.value ?? []).reduce((s, c) => s + c.valorEmAberto, 0))
 const totalPerda = computed(() => ranking.value.reduce((s, r) => s + r.perda, 0))
 
 /** Concentração: quanto da perda esperada está nos três primeiros da fila. */

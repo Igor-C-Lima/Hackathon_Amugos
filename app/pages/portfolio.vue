@@ -4,27 +4,33 @@
 definePageMeta({ layout: 'gestor' })
 useHead({ title: 'Portfólio — Portal Gestor' })
 
+// climatico/commodity/breakdown já vêm embutidos em cada doc de cliente (useCarteira.ts) —
+// useListaClientes basta, sem precisar de useDossie por cliente.
+const listaClientes = useListaClientes()
+
 /** Sliders do stress test combinado: queda adicional de preço e agravamento do índice climático. */
 const quedaPreco = ref(0)
 const agravamentoClima = ref(0)
+
+type ClienteComIndices = NonNullable<typeof listaClientes.value>[number]
 
 /**
  * Impacto no score ponderado pelos pesos reais de cada cliente (ScoreBreakdown).
  * ponytail: multiplicador 6 é calibração de demo — trocar pelo coeficiente do motor quando existir.
  */
-function scoreSimulado(d: ClienteDossie) {
+function scoreSimulado(c: ClienteComIndices) {
   const perda
-    = quedaPreco.value * 6 * (d.breakdown.pesoCommodity / 100)
-      + agravamentoClima.value * 6 * (d.breakdown.pesoClimatico / 100)
-  return Math.max(0, Math.round(d.cliente.scoreAtual - perda))
+    = quedaPreco.value * 6 * (c.breakdown.pesoCommodity / 100)
+      + agravamentoClima.value * 6 * (c.breakdown.pesoClimatico / 100)
+  return Math.max(0, Math.round(c.scoreAtual - perda))
 }
 
 const simulacao = computed(() =>
-  carteira.map(d => ({
-    dossie: d,
-    score: scoreSimulado(d),
-    rating: ratingDoScore(scoreSimulado(d)),
-    rebaixado: ratingDoScore(scoreSimulado(d)) !== d.cliente.ratingAtual,
+  (listaClientes.value ?? []).map(c => ({
+    dossie: { cliente: c, climatico: c.climatico, commodity: c.commodity },
+    score: scoreSimulado(c),
+    rating: ratingDoScore(scoreSimulado(c)),
+    rebaixado: ratingDoScore(scoreSimulado(c)) !== c.ratingAtual,
   })),
 )
 
@@ -33,23 +39,24 @@ const cenarioAtivo = computed(() => quedaPreco.value > 0 || agravamentoClima.val
 const media = (ns: number[]) => Math.round(ns.reduce((s, n) => s + n, 0) / ns.length)
 
 const kpis = computed(() => {
+  const todos = listaClientes.value ?? []
   const scores = simulacao.value.map(s => s.score)
   const emRisco = simulacao.value.filter(s => s.rating === 'D' || s.rating === 'F').length
   return {
-    clientes: carteira.length,
-    exposto: carteira.reduce((s, d) => s + (d.cliente.limiteCreditoRecomendado ?? 0), 0),
+    clientes: todos.length,
+    exposto: todos.reduce((s, c) => s + (c.limiteCreditoRecomendado ?? 0), 0),
     scoreMedio: media(scores),
-    scoreMedioBase: media(carteira.map(d => d.cliente.scoreAtual)),
+    scoreMedioBase: media(todos.map(c => c.scoreAtual)),
     emRisco,
-    emRiscoBase: carteira.filter(d => d.cliente.ratingAtual === 'D' || d.cliente.ratingAtual === 'F').length,
+    emRiscoBase: todos.filter(c => c.ratingAtual === 'D' || c.ratingAtual === 'F').length,
   }
 })
 
 /** Agregação por chave arbitrária — serve tanto para cultura quanto para praça. */
-function agrupar(chave: (d: ClienteDossie) => string) {
+function agrupar(chave: (c: ClienteComIndices) => string) {
   const grupos = new Map<string, typeof simulacao.value>()
   for (const item of simulacao.value) {
-    const k = chave(item.dossie)
+    const k = chave(item.dossie.cliente)
     grupos.set(k, [...(grupos.get(k) ?? []), item])
   }
   return [...grupos.entries()]
@@ -65,8 +72,8 @@ function agrupar(chave: (d: ClienteDossie) => string) {
     .sort((a, b) => b.exposto - a.exposto)
 }
 
-const porCultura = computed(() => agrupar(d => rotuloCultura[d.cliente.culturaPredominante]))
-const porRegiao = computed(() => agrupar(d => `${d.cliente.municipio} / ${d.cliente.uf}`))
+const porCultura = computed(() => agrupar(c => rotuloCultura[c.culturaPredominante]))
+const porRegiao = computed(() => agrupar(c => `${c.municipio} / ${c.uf}`))
 
 const rebaixados = computed(() => simulacao.value.filter(s => s.rebaixado))
 </script>

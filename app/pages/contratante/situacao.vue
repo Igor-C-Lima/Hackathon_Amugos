@@ -7,10 +7,10 @@ import type { Rating, TipoRedFlag } from '~~/types/firestore'
 useHead({ title: 'Minha situação — Portal do Contratante' })
 
 const contratante = useContratante()
-const dossie = computed(() => buscarDossie(contratante.value))
+const { dossie, pending } = useDossie(contratante)
 
-watchEffect(() => {
-  if (!dossie.value) navigateTo('/contratante')
+watch([pending, dossie], ([carregando, d]) => {
+  if (!carregando && !d) navigateTo('/contratante')
 })
 
 const explicacaoRating: Record<Rating, string> = {
@@ -71,18 +71,15 @@ function sair() {
       <!-- RF-14: score e rating em linguagem simples -->
       <UCard>
         <div class="flex flex-wrap items-center gap-6">
-          <div class="flex items-baseline gap-2">
-            <span class="font-mono text-5xl font-semibold tabular-nums">
-              {{ dossie.cliente.scoreAtual }}
-            </span>
-            <span class="text-muted">de 1000</span>
+          <MedidorScore :score="dossie.cliente.scoreAtual" :rating="dossie.cliente.ratingAtual" :tamanho="140" />
+          <div class="min-w-0 flex-1 space-y-2">
+            <UBadge :color="corRating[dossie.cliente.ratingAtual]" variant="subtle" size="lg">
+              Classificação {{ dossie.cliente.ratingAtual }}
+            </UBadge>
+            <p class="text-sm text-toned">
+              {{ explicacaoRating[dossie.cliente.ratingAtual] }}
+            </p>
           </div>
-          <UBadge :color="corRating[dossie.cliente.ratingAtual]" variant="subtle" size="lg">
-            Classificação {{ dossie.cliente.ratingAtual }}
-          </UBadge>
-          <p class="flex-1 text-sm text-toned">
-            {{ explicacaoRating[dossie.cliente.ratingAtual] }}
-          </p>
         </div>
 
         <template #footer>

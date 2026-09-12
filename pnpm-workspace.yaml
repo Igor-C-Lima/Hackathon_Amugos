@@ -4,3 +4,5 @@ allowBuilds:
   protobufjs: true
   unrs-resolver: true
   vue-demi: true
+minimumReleaseAgeExclude:
+  - yaml@2.9.1

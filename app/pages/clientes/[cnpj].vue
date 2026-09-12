@@ -1,45 +1,104 @@
 <script setup lang="ts">
+import { marked } from 'marked'
+
 // Página 3 — Ficha do Cliente. A mais pesada do MVP:
 // RF-01 a RF-05, RF-08, RF-09, RF-11, RF-12, RF-22, RF-29, RF-30 + regras do glossário (plano §4).
 definePageMeta({ layout: 'gestor' })
 
 const route = useRoute()
-const dossie = buscarDossie(route.params.cnpj as string)
+const cnpj = route.params.cnpj as string
+const { dossie, pending } = useDossie(cnpj)
 
-if (!dossie) {
-  throw createError({ statusCode: 404, statusMessage: 'Cliente não encontrado', fatal: true })
-}
+// A busca é assíncrona agora (Firestore) — só dá pra saber que não existe depois que
+// a consulta termina e ainda assim não veio nada. `showError`, não `createError` direto:
+// isso roda depois da renderização inicial, não durante ela.
+watch([pending, dossie], ([carregando, d]) => {
+  if (!carregando && !d) {
+    showError(createError({ statusCode: 404, statusMessage: 'Cliente não encontrado', fatal: true }))
+  }
+})
 
-const {
-  cliente,
-  climatico,
-  commodity,
-  breakdown,
-  historico,
-  janelaColheita,
-  fimColheita,
-  proximoVencimento,
-  cobrancas,
-  imovel,
-} = dossie!
+// Os campos abaixo só existem quando dossie carrega — o template inteiro fica atrás de
+// um `v-if="dossie"`, então o `!` é seguro: se `cliente` está sendo lido, `dossie` já existe.
+const cliente = computed(() => dossie.value!.cliente)
+const climatico = computed(() => dossie.value!.climatico)
+const commodity = computed(() => dossie.value!.commodity)
+const breakdown = computed(() => dossie.value!.breakdown)
+const historico = computed(() => dossie.value!.historico)
+const janelaColheita = computed(() => dossie.value!.janelaColheita)
+const fimColheita = computed(() => dossie.value!.fimColheita)
+const proximoVencimento = computed(() => dossie.value!.proximoVencimento)
+const cobrancas = computed(() => dossie.value!.cobrancas)
+const imovel = computed(() => dossie.value!.imovel)
 
-useHead({ title: `${cliente.razaoSocial} — Portal Gestor` })
+useHead({
+  title: computed(() => dossie.value ? `${dossie.value.cliente.razaoSocial} — Portal Gestor` : 'Ficha do cliente'),
+})
 
 const toast = useToast()
 const perfil = usePerfil()
 
-const emRJ = computed(() => cliente.redFlags.some(f => f.tipo === 'rj'))
+const {
+  relatorio,
+  erroRelatorio,
+  carregandoRelatorio,
+  gerarRelatorio,
+} = useAnaliseCliente()
+
+const usarRelatorioMock = ref(true)
+
+const resumoExecutivo = computed(() => relatorio.value || cliente.value.relatorioLLM)
+const resumoExecutivoHtml = computed(() => marked.parse(resumoExecutivo.value ?? '', { async: false }))
+
+/**
+ * Dados já conhecidos do dossiê sintético, usados como fallback quando o
+ * CNPJ é fictício (carteira mock) e a Receita Federal/DataJud/SICAR reais
+ * não encontram nada. Se o CNPJ for real, o fallback simplesmente não é
+ * usado — os coletores reais têm prioridade.
+ */
+const fallbackSintetico = computed(() => ({
+  receitaFederal: {
+    razaoSocial: cliente.value.razaoSocial,
+    situacao: 'ATIVA',
+    cnaeDescricao: cliente.value.cnae,
+    dataAbertura: cliente.value.dataAbertura.toISOString().slice(0, 10),
+    socios: [] as string[],
+    municipio: cliente.value.municipio,
+    uf: cliente.value.uf,
+  },
+  dataJud: {
+    processos: cliente.value.redFlags
+      .filter(f => f.tipo === 'rj' || f.tipo === 'protesto')
+      .map(f => ({ tipo: rotuloRedFlag[f.tipo], status: f.severidade })),
+  },
+  sicar: {
+    areaHectares: imovel.value.areaTotalHa,
+    regular: imovel.value.situacaoCAR === 'ativo',
+    embargos: cliente.value.redFlags.filter(f => f.tipo === 'embargo_ambiental').length,
+  },
+}))
+
+const emRJ = computed(() => cliente.value.redFlags.some(f => f.tipo === 'rj'))
 
 const fatores = computed(() => [
-  { rotulo: 'Jurídico / fiscal / cadastral', peso: breakdown.pesoJuridicoFiscal, cor: 'neutral' as const },
-  { rotulo: 'Risco climático (ONI × CONAB)', peso: breakdown.pesoClimatico, cor: 'warning' as const },
-  { rotulo: 'Exposição a preço de commodity', peso: breakdown.pesoCommodity, cor: 'info' as const },
+  { rotulo: 'Jurídico / fiscal / cadastral', peso: breakdown.value.pesoJuridicoFiscal, cor: 'neutral' as const },
+  { rotulo: 'Risco climático (ONI × CONAB)', peso: breakdown.value.pesoClimatico, cor: 'warning' as const },
+  { rotulo: 'Exposição a preço de commodity', peso: breakdown.value.pesoCommodity, cor: 'info' as const },
 ])
 
 /** RF-29: a fatura vence antes de o cliente terminar de colher e comercializar? */
-const vencimentoAntesDaColheita = computed(() => !!fimColheita && proximoVencimento < fimColheita)
+const vencimentoAntesDaColheita = computed(() => !!fimColheita.value && proximoVencimento.value < fimColheita.value)
 
-const limite = ref(cliente.limiteCreditoRecomendado ?? 0)
+// O limite parte da recomendação do motor assim que o cliente carrega, mas não deve
+// voltar a pular se o Firestore reemitir o mesmo doc por um motivo qualquer — só
+// preenche na primeira vez que os dados chegam (`once`, Vue 3.4+). Também semeia
+// direto do valor já resolvido: numa navegação SSR (URL direta/reload) `dossie` já
+// chega pronto na montagem, e um `watch` sem `immediate` nunca dispara nesse caso —
+// só reage a mudanças depois do setup.
+const limite = ref(dossie.value?.cliente.limiteCreditoRecomendado ?? 0)
+watch(dossie, (d) => {
+  if (d) limite.value = d.cliente.limiteCreditoRecomendado ?? 0
+}, { once: true })
 
 /**
  * Exportação em PDF pelo diálogo de impressão do navegador — sem dependência extra.
@@ -62,29 +121,47 @@ async function imprimir(recorte: 'ficha' | 'cobranca') {
 }
 
 const totalNegociado = computed(() =>
-  cobrancas.reduce((s, c) => s + (c.valor ?? 0), 0),
+  cobrancas.value.reduce((s, c) => s + (c.valor ?? 0), 0),
 )
 
 /** RF-28: CAR fora de "ativo" compromete a garantia sobre a área e pode travar crédito rural. */
-const carIrregular = computed(() => imovel.situacaoCAR !== 'ativo')
+const carIrregular = computed(() => imovel.value.situacaoCAR !== 'ativo')
 
 const proporcaoPlantada = computed(() =>
-  Math.round((imovel.areaPlantadaHa / imovel.areaTotalHa) * 100),
+  Math.round((imovel.value.areaPlantadaHa / imovel.value.areaTotalHa) * 100),
 )
 
-function registrarDecisao() {
-  // RF-11: decisão manual com registro de auditoria — persistência fica para o Firestore.
-  toast.add({
-    title: 'Decisão registrada',
-    description: `Limite de ${brl(limite.value)} aprovado para ${cliente.razaoSocial}.`,
-    color: 'success',
-    icon: 'i-lucide-check',
-  })
+const salvando = ref(false)
+
+async function registrarDecisao() {
+  // RF-11: decisão manual — grava direto no doc do cliente (sem trilha de auditoria
+  // separada, fora do MVP por decisão de escopo já registrada em PRODUCT.md).
+  salvando.value = true
+  try {
+    await registrarDecisaoCredito(cnpj, limite.value, cliente.value.condicoesPagamentoRecomendadas)
+    toast.add({
+      title: 'Decisão registrada',
+      description: `Limite de ${brl(limite.value)} aprovado para ${cliente.value.razaoSocial}.`,
+      color: 'success',
+      icon: 'i-lucide-check',
+    })
+  }
+  catch {
+    toast.add({
+      title: 'Falha ao registrar',
+      description: 'Não foi possível salvar a decisão no banco. Tente de novo.',
+      color: 'error',
+      icon: 'i-lucide-triangle-alert',
+    })
+  }
+  finally {
+    salvando.value = false
+  }
 }
 </script>
 
 <template>
-  <UDashboardPanel id="ficha">
+  <UDashboardPanel v-if="dossie" id="ficha">
     <template #header>
       <UDashboardNavbar :title="cliente.nomeFantasia ?? cliente.razaoSocial">
         <template #leading>
@@ -131,13 +208,10 @@ function registrarDecisao() {
         <!-- Os quatro números que decidem o crédito -->
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <UPageCard
-            icon="i-lucide-gauge"
             title="Score consolidado"
             :description="`Rating ${cliente.ratingAtual} · atualizado em ${dataBR(cliente.atualizadoEm)}`"
           >
-            <p class="font-mono text-3xl font-semibold tabular-nums">
-              {{ cliente.scoreAtual }}
-            </p>
+            <MedidorScore :score="cliente.scoreAtual" :rating="cliente.ratingAtual" :tamanho="104" />
           </UPageCard>
 
           <UPageCard
@@ -479,19 +553,42 @@ function registrarDecisao() {
         <!-- Relatório LLM (RF-04) -->
         <UCard>
           <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-sparkles" class="size-4 text-primary" />
-              <h2 class="font-semibold">
-                Resumo executivo
-              </h2>
-              <UBadge color="neutral" variant="subtle" size="sm">
-                gerado por LLM
-              </UBadge>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-sparkles" class="size-4 text-primary" />
+                <h2 class="font-semibold">
+                  Resumo executivo
+                </h2>
+                <UBadge color="neutral" variant="subtle" size="sm">
+                  {{ relatorio ? 'gerado agora' : 'exemplo' }}
+                </UBadge>
+              </div>
+              <div class="flex items-center gap-3 print:hidden">
+                <USwitch v-model="usarRelatorioMock" label="usar mock" />
+                <UButton
+                  icon="i-lucide-refresh-cw"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                  :loading="carregandoRelatorio"
+                  @click="gerarRelatorio(cliente.cnpj, usarRelatorioMock, fallbackSintetico)"
+                >
+                  Gerar relatório
+                </UButton>
+              </div>
             </div>
           </template>
-          <p class="text-sm leading-relaxed text-toned">
-            {{ cliente.relatorioLLM }}
-          </p>
+
+          <UAlert
+            v-if="erroRelatorio"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="erroRelatorio"
+            class="mb-4"
+          />
+
+          <div class="relatorio-md text-sm text-toned" v-html="resumoExecutivoHtml" />
         </UCard>
 
         <!-- Histórico de cobrança — seção da Recuperação, exportável em PDF por si só.
@@ -644,7 +741,7 @@ function registrarDecisao() {
               <p>{{ cliente.condicoesPagamentoRecomendadas }}</p>
             </div>
 
-            <UButton icon="i-lucide-check" @click="registrarDecisao">
+            <UButton icon="i-lucide-check" :loading="salvando" @click="registrarDecisao">
               Registrar decisão
             </UButton>
           </div>
@@ -652,4 +749,128 @@ function registrarDecisao() {
       </div>
     </template>
   </UDashboardPanel>
+
+  <UDashboardPanel v-else id="ficha-carregando">
+    <template #header>
+      <UDashboardNavbar title="Carregando...">
+        <template #leading>
+          <UButton
+            to="/clientes"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            aria-label="Voltar para clientes"
+          />
+        </template>
+      </UDashboardNavbar>
+    </template>
+    <template #body>
+      <div class="flex items-center justify-center py-24 text-muted">
+        <UIcon v-if="pending" name="i-lucide-loader-circle" class="size-6 animate-spin" />
+      </div>
+    </template>
+  </UDashboardPanel>
 </template>
+
+<style scoped>
+/*
+ * v-html injeta HTML fora do compilador do Vue, então o CSS "scoped" normal
+ * não alcança esses elementos — por isso :deep() em cada seletor. Cores e
+ * espaçamento seguem os tokens do Field Ledger (app.vue/main.css), não
+ * valores soltos, pra o relatório do LLM combinar com o resto da ficha.
+ */
+.relatorio-md :deep(h1),
+.relatorio-md :deep(h2),
+.relatorio-md :deep(h3) {
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  color: var(--ui-text-highlighted);
+}
+
+.relatorio-md :deep(h1:first-child),
+.relatorio-md :deep(h2:first-child),
+.relatorio-md :deep(h3:first-child) {
+  margin-top: 0;
+}
+
+.relatorio-md :deep(h1) {
+  font-size: 1.125rem;
+}
+
+.relatorio-md :deep(h2) {
+  font-size: 1.0625rem;
+}
+
+.relatorio-md :deep(h3) {
+  font-size: 1rem;
+}
+
+.relatorio-md :deep(p) {
+  margin-bottom: 0.85em;
+  line-height: 1.6;
+}
+
+.relatorio-md :deep(strong) {
+  font-weight: 600;
+  color: var(--ui-text-highlighted);
+}
+
+.relatorio-md :deep(ul),
+.relatorio-md :deep(ol) {
+  margin-bottom: 0.85em;
+  padding-left: 1.25rem;
+}
+
+.relatorio-md :deep(li) {
+  margin-bottom: 0.3em;
+  line-height: 1.5;
+}
+
+.relatorio-md :deep(li > ul),
+.relatorio-md :deep(li > ol) {
+  margin-top: 0.3em;
+  margin-bottom: 0;
+}
+
+.relatorio-md :deep(blockquote) {
+  margin: 0.85em 0;
+  border-left: 3px solid var(--ui-primary);
+  padding-left: 0.85rem;
+  color: var(--ui-text-muted);
+}
+
+.relatorio-md :deep(hr) {
+  margin: 1.25em 0;
+  border: none;
+  border-top: 1px solid var(--ui-border);
+}
+
+.relatorio-md :deep(code) {
+  border-radius: var(--ui-radius);
+  background: var(--ui-bg-muted);
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+}
+
+.relatorio-md :deep(table) {
+  width: 100%;
+  margin-bottom: 0.85em;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.relatorio-md :deep(th),
+.relatorio-md :deep(td) {
+  border: 1px solid var(--ui-border);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.relatorio-md :deep(th) {
+  background: var(--ui-bg-muted);
+  font-weight: 600;
+  color: var(--ui-text-highlighted);
+}
+</style>

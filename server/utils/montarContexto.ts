@@ -2,6 +2,13 @@ export interface DiagnosticoFonte {
   fonte: string
   sucesso: boolean
   erro?: string
+  origem?: 'real' | 'sintetico'
+}
+
+export interface FallbackColetores {
+  receitaFederal?: DadosReceitaFederal
+  dataJud?: DadosDataJud
+  sicar?: DadosSicar
 }
 
 export interface DadosColetados {
@@ -22,15 +29,21 @@ function extrairMensagemErro(error: any): string {
   return error?.data?.statusMessage ?? error?.data?.message ?? error?.statusMessage ?? error?.message ?? 'Erro desconhecido'
 }
 
-async function coletar<T>(fonte: string, promessa: Promise<T>): Promise<{ dados: T | null, diagnostico: DiagnosticoFonte }> {
+async function coletar<T>(fonte: string, promessa: Promise<T>, fallback?: T): Promise<{ dados: T | null, diagnostico: DiagnosticoFonte }> {
   try {
     const dados = await promessa
     console.log(`[coleta] ${fonte}: sucesso —`, JSON.stringify(dados))
-    return { dados, diagnostico: { fonte, sucesso: true } }
+    return { dados, diagnostico: { fonte, sucesso: true, origem: 'real' } }
   }
   catch (error: any) {
     const mensagem = extrairMensagemErro(error)
     console.error(`[coleta] ${fonte}: falhou —`, mensagem)
+
+    if (fallback) {
+      console.log(`[coleta] ${fonte}: usando dado sintético de fallback —`, JSON.stringify(fallback))
+      return { dados: fallback, diagnostico: { fonte, sucesso: true, origem: 'sintetico' } }
+    }
+
     return { dados: null, diagnostico: { fonte, sucesso: false, erro: mensagem } }
   }
 }
@@ -81,11 +94,11 @@ function montarBlocoZoneamento(zarc: DadosZarc | null): string {
   return `Zoneamento agrícola indica risco de ${zarc.riscoPercentual}% para o plantio de soja na região, com janela recomendada entre ${zarc.mesInicio} e ${zarc.mesFim}.`
 }
 
-export async function montarContexto(cnpj: string): Promise<ContextoMontado> {
+export async function montarContexto(cnpj: string, fallback?: FallbackColetores): Promise<ContextoMontado> {
   const [receitaFederalColetado, dataJudColetado, sicarColetado] = await Promise.all([
-    coletar('Receita Federal', consultarReceitaFederal(cnpj)),
-    coletar('DataJud', consultarDataJud(cnpj)),
-    coletar('SICAR', consultarSicar(cnpj)),
+    coletar('Receita Federal', consultarReceitaFederal(cnpj), fallback?.receitaFederal),
+    coletar('DataJud', consultarDataJud(cnpj), fallback?.dataJud),
+    coletar('SICAR', consultarSicar(cnpj), fallback?.sicar),
   ])
 
   const dadosReceitaFederal = receitaFederalColetado.dados
