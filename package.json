@@ -8,7 +8,8 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "lint": "eslint .",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "deploy": "nuxt build && grep -v '^FIREBASE_' .env > .output/server/.env && npm install --prefix .output/server --omit=dev --no-audit --no-fund && firebase deploy --force"
   },
   "dependencies": {
     "@nuxt/ui": "4.11.1",
@@ -35,6 +36,7 @@
     "dayjs": "^1.11.23",
     "eslint": "^10.10.0",
     "firebase": "^12.19.0",
+    "firebase-tools": "^15.30.0",
     "nuxt": "^4.5.2",
     "nuxt-vuefire": "1.1.2",
     "tailwindcss": "^4.3.3",

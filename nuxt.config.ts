@@ -5,6 +5,11 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui', 'nuxt-vuefire', '@nuxt/eslint', '@vueuse/nuxt'],
   css: [ '~/assets/css/main.css' ],
 
+  nitro: {
+    preset: 'firebase',
+    firebase: { gen: 2, nodeVersion: '22' },
+  },
+
   vuefire: {
     config: {
       apiKey: process.env.FIREBASE_API_KEY,
