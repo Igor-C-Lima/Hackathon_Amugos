@@ -27,6 +27,18 @@ export const corRating: Record<Rating, 'success' | 'info' | 'warning' | 'error' 
   F: 'error',
 }
 
+const LIMIAR_RATING: Record<Rating, number> = { A: 800, B: 650, C: 500, D: 350, F: 0 }
+const ORDEM_RATING: Rating[] = ['F', 'D', 'C', 'B', 'A']
+
+/**
+ * RF-14: alvo de progresso pro Portal Contratante — "faltam 40 pontos pro rating B" em vez de
+ * só mostrar o score (GAMIFICACAO.md). `null` quando já está na faixa máxima (A).
+ */
+export function proximaFaixaRating(score: number): { rating: Rating, faltam: number } | null {
+  const proxima = ORDEM_RATING[ORDEM_RATING.indexOf(ratingDoScore(score)) + 1]
+  return proxima ? { rating: proxima, faltam: LIMIAR_RATING[proxima] - score } : null
+}
+
 export const corSeveridade: Record<Severidade, 'neutral' | 'info' | 'warning' | 'error'> = {
   baixa: 'neutral',
   media: 'info',

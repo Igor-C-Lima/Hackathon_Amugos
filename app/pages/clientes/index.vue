@@ -15,12 +15,16 @@ const filtrados = computed(() => {
   const todos = listaClientes.value ?? []
   const termo = busca.value.trim().toLowerCase().replace(/\D/g, '')
   const texto = busca.value.trim().toLowerCase()
-  if (!texto) return todos
-  return todos.filter(c =>
-    c.razaoSocial.toLowerCase().includes(texto)
-    || c.nomeFantasia?.toLowerCase().includes(texto)
-    || (termo.length > 0 && c.cnpj.includes(termo)),
-  )
+  const base = !texto
+    ? todos
+    : todos.filter(c =>
+        c.razaoSocial.toLowerCase().includes(texto)
+        || c.nomeFantasia?.toLowerCase().includes(texto)
+        || (termo.length > 0 && c.cnpj.includes(termo)),
+      )
+
+  // Pior score primeiro — quem precisa de atenção aparece no topo da lista.
+  return [...base].sort((a, b) => a.scoreAtual - b.scoreAtual)
 })
 
 const colunas: TableColumn<typeof filtrados.value[number]>[] = [
