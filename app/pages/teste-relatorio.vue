@@ -1,21 +1,26 @@
 <script setup lang="ts">
-const texto = ref('')
-const usarMock = ref(true)
+const route = useRoute()
+const cnpj = computed(() => String(route.query.cnpj ?? ''))
+
 const relatorio = ref('')
 const erro = ref('')
-const carregando = ref(false)
+const carregando = ref(true)
 
 async function gerarRelatorio() {
   carregando.value = true
   erro.value = ''
   relatorio.value = ''
 
-  const endpoint = usarMock.value ? '/api/relatorio-mock' : '/api/relatorio'
+  if (!cnpj.value) {
+    erro.value = 'Nenhum CNPJ informado na URL (?cnpj=...)'
+    carregando.value = false
+    return
+  }
 
   try {
-    const resposta = await $fetch<{ relatorio: string | null, erro: string | null }>(endpoint, {
+    const resposta = await $fetch<{ relatorio: string | null, erro: string | null }>('/api/relatorio', {
       method: 'POST',
-      body: { texto: texto.value },
+      body: { cnpj: cnpj.value },
     })
 
     if (resposta.erro) {
@@ -26,38 +31,28 @@ async function gerarRelatorio() {
     }
   }
   catch (e: any) {
-    erro.value = e?.message ?? 'Erro ao gerar relatório'
+    erro.value = e?.data?.statusMessage ?? e?.message ?? 'Erro ao gerar relatório'
   }
   finally {
     carregando.value = false
   }
 }
+
+onMounted(gerarRelatorio)
 </script>
 
 <template>
   <div style="max-width: 640px; margin: 2rem auto; padding: 0 1rem;">
-    <h1>Teste de relatório</h1>
+    <h1>Relatório — CNPJ {{ cnpj }}</h1>
 
-    <textarea
-      v-model="texto"
-      rows="6"
-      placeholder="Digite aqui os dados do cliente..."
-      style="width: 100%; margin-bottom: 1rem;"
-    />
+    <p v-if="carregando">
+      Gerando relatório...
+    </p>
 
-    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-      <input v-model="usarMock" type="checkbox">
-      usar mock
-    </label>
-
-    <button :disabled="carregando" @click="gerarRelatorio">
-      {{ carregando ? 'Gerando...' : 'Gerar relatório' }}
-    </button>
-
-    <p v-if="erro" style="color: red; margin-top: 1rem;">
+    <p v-if="erro" style="color: red;">
       {{ erro }}
     </p>
 
-    <pre v-if="relatorio" style="white-space: pre-wrap; margin-top: 1rem;">{{ relatorio }}</pre>
+    <pre v-if="relatorio" style="white-space: pre-wrap;">{{ relatorio }}</pre>
   </div>
 </template>
