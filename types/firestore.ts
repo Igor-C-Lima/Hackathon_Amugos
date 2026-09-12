@@ -42,6 +42,8 @@ export interface Cliente {
   ratingAtual: Rating
   limiteCreditoRecomendado?: number
   condicoesPagamentoRecomendadas?: string
+  /** Saldo devedor de insumo já faturado, em BRL. Entra no ranking Risco × Valor em Aberto (RF-07). */
+  valorEmAberto: number
   redFlags: RedFlag[]
   relatorioLLM?: string
   criadoEm: Date
@@ -53,6 +55,28 @@ export interface RedFlag {
   descricao: string
   severidade: Severidade
   detectadoEm: Date
+}
+
+export type CanalCobranca = 'telefone' | 'email' | 'whatsapp' | 'visita' | 'carta' | 'juridico'
+
+export type ResultadoCobranca =
+  | 'sem_contato'
+  | 'promessa_pagamento'
+  | 'renegociado'
+  | 'pagamento_parcial'
+  | 'quitado'
+  | 'recusa'
+
+/** Uma tentativa de cobrança registrada na esteira de recuperação. */
+export interface InteracaoCobranca {
+  clienteId: string
+  data: Date
+  canal: CanalCobranca
+  responsavel: string
+  resultado: ResultadoCobranca
+  /** Valor prometido, renegociado ou efetivamente pago na interação, em BRL. */
+  valor?: number
+  observacao: string
 }
 
 export interface HistoricoScore {
@@ -91,6 +115,20 @@ export interface IndiceExposicaoCommodity {
   tendencia: 'alta' | 'estavel' | 'queda'
   indiceExposicao: number
   calculadoEm: Date
+}
+
+export type SituacaoCAR = 'ativo' | 'pendente' | 'suspenso' | 'cancelado'
+
+/** RF-28: área plantada e regularidade da propriedade, via CAR/SICAR. */
+export interface ImovelRural {
+  clienteId: string
+  codigoCAR: string
+  areaTotalHa: number
+  /** Área efetivamente em produção — é ela que gera a receita que paga o insumo. */
+  areaPlantadaHa: number
+  reservaLegalHa: number
+  situacaoCAR: SituacaoCAR
+  consultadoEm: Date
 }
 
 /** RF-08: explicabilidade — peso de cada fator na nota final. */

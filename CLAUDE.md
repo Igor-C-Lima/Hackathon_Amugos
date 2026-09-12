@@ -4,14 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development plan
 
-See `DEVELOPMENT_PLAN.md` (Portuguese) for the full requirements spec — read it before implementing features. Summary:
+Two spec documents, both Portuguese — read both before implementing features:
+
+- `DEVELOPMENT_PLAN.md` — full requirements and domain rationale.
+- `PAGES.md` — page-by-page breakdown (8 pages) and the **current RF numbering**.
+
+**They disagree on RF numbers.** `PAGES.md` renumbered them when RF-07 became the Priorização de Cobrança module: what `DEVELOPMENT_PLAN.md` calls RF-07/08/09/10/11 is RF-08/09/10/11/12 in `PAGES.md`. Code comments follow `PAGES.md`. When a plan section and a pages section conflict, `PAGES.md` is newer.
+
+Summary of the domain:
 
 Hackathon project (PMI-DF 2026) for **Krill Tech**, an agricultural input supplier that sells on credit tied to the harvest cycle. The system anticipates a client's ability to pay by scoring two forward-looking risk factors — before the harvest, not after a payment is missed:
 
 - **Climate risk**: ONI (El Niño/La Niña) index history cross-referenced with regional crop productivity (CONAB) and observed weather (INMET) — "will the harvest exist?"
 - **Commodity price risk**: CEPEA/ESALQ price trends for the client's crop, cross-referenced with harvest calendar (ZARC) — "will it be worth enough?"
 
-These combine with standard legal/fiscal red flags (RJ, protesto, embargo ambiental) into a 0–1000 score and A–D rating (matches `types/firestore.ts`). Two portals: **Portal Gestor** (internal, Krill Tech analysts/management — full due diligence, red flags, credit limit recommendations, alerts) and **Portal Contratante** (external, the client — read-only view of their own score/pendencies, no dispute channel by product decision).
+These combine with standard legal/fiscal red flags (RJ, protesto, embargo ambiental) into a 0–1000 score and A–F rating (the specs say A–D; `types/firestore.ts` added F and is authoritative).
+
+Two portals. **Portal Gestor** (internal) splits into two sections that must stay visually distinct: *Crédito* (decide who gets a limit — Clientes, Ficha, Portfólio) and *Recuperação* (act on what is already owed — Esteira de Priorização de Cobrança, ranked by risk × outstanding balance). Alertas feeds both. Three roles gate it: `credito`, `cobranca`, `diretoria` — Portfólio is Diretoria-only, and the role picked at login decides the landing route (`rotaInicial` in `app/utils/dominio.ts`). **Portal Contratante** (external, the client) is read-only: own score and pendencies, no channel to contest a red flag, by product decision.
 
 Key constraints from the plan:
 - Only non-negotiable NFR: API keys (LLM, CEPEA, etc.) must never be exposed client-side — proxy all external calls through Cloud Functions.

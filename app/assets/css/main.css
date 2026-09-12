@@ -1,1 +1,19 @@
 /* CSS principal do projeto */
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/* RF-12: exportação em PDF usa o diálogo de impressão do navegador. */
+@media print {
+  /* Painéis do dashboard rolam internamente; na impressão precisam fluir por todas as páginas. */
+  [class*="overflow-"] {
+    overflow: visible !important;
+  }
+
+  /*
+   * Recorte "só o histórico de cobrança": esconde tudo que não seja a seção,
+   * seus ancestrais ou seu conteúdo. Uma regra em vez de marcar cada bloco da ficha.
+   */
+  body.imprimir-so-cobranca *:not(:has(.secao-cobranca)):not(.secao-cobranca):not(.secao-cobranca *) {
+    display: none !important;
+  }
+}

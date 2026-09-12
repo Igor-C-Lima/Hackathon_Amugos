@@ -1,6 +1,12 @@
+<script setup lang="ts">
+import { pt_br } from '@nuxt/ui/locale'
+</script>
+
 <template>
-  <div>
+  <UApp :locale="pt_br">
     <NuxtRouteAnnouncer />
-    <NuxtPage />
-  </div>
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+  </UApp>
 </template>

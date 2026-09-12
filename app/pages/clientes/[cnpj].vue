@@ -1,0 +1,655 @@
+<script setup lang="ts">
+// Página 3 — Ficha do Cliente. A mais pesada do MVP:
+// RF-01 a RF-05, RF-08, RF-09, RF-11, RF-12, RF-22, RF-29, RF-30 + regras do glossário (plano §4).
+definePageMeta({ layout: 'gestor' })
+
+const route = useRoute()
+const dossie = buscarDossie(route.params.cnpj as string)
+
+if (!dossie) {
+  throw createError({ statusCode: 404, statusMessage: 'Cliente não encontrado', fatal: true })
+}
+
+const {
+  cliente,
+  climatico,
+  commodity,
+  breakdown,
+  historico,
+  janelaColheita,
+  fimColheita,
+  proximoVencimento,
+  cobrancas,
+  imovel,
+} = dossie!
+
+useHead({ title: `${cliente.razaoSocial} — Portal Gestor` })
+
+const toast = useToast()
+const perfil = usePerfil()
+
+const emRJ = computed(() => cliente.redFlags.some(f => f.tipo === 'rj'))
+
+const fatores = computed(() => [
+  { rotulo: 'Jurídico / fiscal / cadastral', peso: breakdown.pesoJuridicoFiscal, cor: 'neutral' as const },
+  { rotulo: 'Risco climático (ONI × CONAB)', peso: breakdown.pesoClimatico, cor: 'warning' as const },
+  { rotulo: 'Exposição a preço de commodity', peso: breakdown.pesoCommodity, cor: 'info' as const },
+])
+
+/** RF-29: a fatura vence antes de o cliente terminar de colher e comercializar? */
+const vencimentoAntesDaColheita = computed(() => !!fimColheita && proximoVencimento < fimColheita)
+
+const limite = ref(cliente.limiteCreditoRecomendado ?? 0)
+
+/**
+ * Exportação em PDF pelo diálogo de impressão do navegador — sem dependência extra.
+ * Dois documentos saem da mesma página: a ficha inteira (RF-12) e só o histórico de cobrança.
+ * A classe no <body> diz ao CSS de impressão qual dos dois recortar.
+ */
+const soCobranca = ref(false)
+const emitidoEm = ref('')
+
+useHead({
+  bodyAttrs: { class: computed(() => (soCobranca.value ? 'imprimir-so-cobranca' : '')) },
+})
+
+async function imprimir(recorte: 'ficha' | 'cobranca') {
+  emitidoEm.value = new Date().toLocaleString('pt-BR')
+  soCobranca.value = recorte === 'cobranca'
+  await nextTick()
+  window.print()
+  soCobranca.value = false
+}
+
+const totalNegociado = computed(() =>
+  cobrancas.reduce((s, c) => s + (c.valor ?? 0), 0),
+)
+
+/** RF-28: CAR fora de "ativo" compromete a garantia sobre a área e pode travar crédito rural. */
+const carIrregular = computed(() => imovel.situacaoCAR !== 'ativo')
+
+const proporcaoPlantada = computed(() =>
+  Math.round((imovel.areaPlantadaHa / imovel.areaTotalHa) * 100),
+)
+
+function registrarDecisao() {
+  // RF-11: decisão manual com registro de auditoria — persistência fica para o Firestore.
+  toast.add({
+    title: 'Decisão registrada',
+    description: `Limite de ${brl(limite.value)} aprovado para ${cliente.razaoSocial}.`,
+    color: 'success',
+    icon: 'i-lucide-check',
+  })
+}
+</script>
+
+<template>
+  <UDashboardPanel id="ficha">
+    <template #header>
+      <UDashboardNavbar :title="cliente.nomeFantasia ?? cliente.razaoSocial">
+        <template #leading>
+          <UButton
+            to="/clientes"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            aria-label="Voltar para clientes"
+          />
+        </template>
+        <template #right>
+          <UBadge :color="corRating[cliente.ratingAtual]" variant="subtle" size="lg">
+            Rating {{ cliente.ratingAtual }}
+          </UBadge>
+          <span class="font-mono text-xl font-semibold tabular-nums">
+            {{ cliente.scoreAtual }}<span class="text-sm text-muted">/1000</span>
+          </span>
+          <!-- RF-12: exportar em PDF via diálogo de impressão do navegador — sem dependência extra. -->
+          <UButton
+            icon="i-lucide-file-down"
+            color="neutral"
+            variant="ghost"
+            aria-label="Exportar relatório em PDF"
+            class="print:hidden"
+            @click="imprimir('ficha')"
+          />
+        </template>
+      </UDashboardNavbar>
+    </template>
+
+    <template #body>
+      <div class="space-y-6">
+        <!-- Stay Period: regra do glossário (plano §4) -->
+        <UAlert
+          v-if="emRJ"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-gavel"
+          title="Recuperação judicial deferida — Stay Period ativo"
+          description="Execução e protesto estão suspensos por 180 dias (até 07/07/2026). Nenhuma medida de cobrança é juridicamente possível nesse período: habilite o crédito no processo e acompanhe o plano."
+        />
+
+        <!-- Os quatro números que decidem o crédito -->
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <UPageCard
+            icon="i-lucide-gauge"
+            title="Score consolidado"
+            :description="`Rating ${cliente.ratingAtual} · atualizado em ${dataBR(cliente.atualizadoEm)}`"
+          >
+            <p class="font-mono text-3xl font-semibold tabular-nums">
+              {{ cliente.scoreAtual }}
+            </p>
+          </UPageCard>
+
+          <UPageCard
+            icon="i-lucide-cloud-rain-wind"
+            title="Índice de risco climático"
+            :description="`${rotuloFaseONI[climatico.faseONI]} · queda histórica de ${climatico.quedaProdutividadeHistorica}%`"
+          >
+            <p class="font-mono text-3xl font-semibold tabular-nums">
+              {{ climatico.indiceRisco }}<span class="text-sm text-muted">/100</span>
+            </p>
+          </UPageCard>
+
+          <UPageCard
+            icon="i-lucide-trending-down"
+            title="Exposição a preço"
+            :description="`${rotuloCultura[commodity.cultura]} ${pct(commodity.variacao6Meses)} em 6 meses · tendência de ${commodity.tendencia}`"
+          >
+            <p class="font-mono text-3xl font-semibold tabular-nums">
+              {{ commodity.indiceExposicao }}<span class="text-sm text-muted">/100</span>
+            </p>
+          </UPageCard>
+
+          <UPageCard
+            icon="i-lucide-banknote"
+            title="Limite recomendado"
+            :description="cliente.condicoesPagamentoRecomendadas"
+          >
+            <p class="font-mono text-2xl font-semibold tabular-nums">
+              {{ brl(cliente.limiteCreditoRecomendado ?? 0) }}
+            </p>
+          </UPageCard>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-3">
+          <!-- Dados cadastrais (RF-01) -->
+          <UCard>
+            <template #header>
+              <h2 class="font-semibold">
+                Dados cadastrais
+              </h2>
+            </template>
+            <dl class="space-y-3 text-sm">
+              <div>
+                <dt class="text-muted">
+                  Razão social
+                </dt>
+                <dd>{{ cliente.razaoSocial }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  CNPJ
+                </dt>
+                <dd class="font-mono">
+                  {{ mascaraCnpj(cliente.cnpj) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  CNAE
+                </dt>
+                <dd>{{ cliente.cnae }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Praça
+                </dt>
+                <dd>{{ cliente.municipio }} / {{ cliente.uf }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Abertura
+                </dt>
+                <dd>
+                  {{ dataBR(cliente.dataAbertura) }}
+                  <span class="text-muted">
+                    ({{ 2026 - cliente.dataAbertura.getFullYear() }} anos de atividade)
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Capital social
+                </dt>
+                <dd class="font-mono">
+                  {{ brl(cliente.capitalSocial) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Garantia
+                </dt>
+                <dd>
+                  <template v-if="cliente.garantia">
+                    {{ rotuloGarantia[cliente.garantia.tipo] }}
+                    <UBadge
+                      :color="cliente.garantia.ativo ? 'success' : 'error'"
+                      variant="subtle"
+                      size="sm"
+                    >
+                      {{ cliente.garantia.ativo ? 'ativa' : 'inativa' }}
+                    </UBadge>
+                  </template>
+                  <span v-else class="text-muted">sem garantia registrada</span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Barter / troca
+                </dt>
+                <dd>
+                  <UBadge
+                    :color="cliente.barterAtivo ? 'warning' : 'neutral'"
+                    variant="subtle"
+                    size="sm"
+                  >
+                    {{ cliente.barterAtivo ? 'ativo — exposição dupla' : 'não opera em barter' }}
+                  </UBadge>
+                </dd>
+              </div>
+            </dl>
+          </UCard>
+
+          <!-- Explicabilidade (RF-09, RF-22) -->
+          <UCard class="lg:col-span-2">
+            <template #header>
+              <div>
+                <h2 class="font-semibold">
+                  Como o score foi formado
+                </h2>
+                <p class="text-sm text-muted">
+                  Peso de cada fator na nota final — o score não é caixa-preta.
+                </p>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <div v-for="fator in fatores" :key="fator.rotulo" class="space-y-1.5">
+                <div class="flex items-baseline justify-between text-sm">
+                  <span>{{ fator.rotulo }}</span>
+                  <span class="font-mono tabular-nums text-muted">{{ fator.peso }}%</span>
+                </div>
+                <UProgress :model-value="fator.peso" :color="fator.cor" size="md" />
+              </div>
+
+              <USeparator />
+
+              <div class="grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <p class="mb-1 font-medium">
+                    Por que este cliente está exposto ao clima
+                  </p>
+                  <p class="text-muted">
+                    {{ climatico.regiao }}, cultura de {{ rotuloCultura[climatico.cultura].toLowerCase() }}:
+                    sob {{ rotuloFaseONI[climatico.faseONI].toLowerCase() }}, a produtividade histórica cai
+                    {{ climatico.quedaProdutividadeHistorica }}% (CONAB/INMET). Proxy histórico-estatístico,
+                    não previsão meteorológica.
+                  </p>
+                </div>
+                <div>
+                  <p class="mb-1 font-medium">
+                    Por que está exposto ao preço
+                  </p>
+                  <p class="text-muted">
+                    {{ rotuloCultura[commodity.cultura] }} a
+                    {{ brl(commodity.precoAtual) }}/{{ unidadeCultura[commodity.cultura] }}
+                    (CEPEA/ESALQ), {{ pct(commodity.variacao6Meses) }} em 6 meses. Colheita em
+                    {{ janelaColheita }}; fatura vence em {{ dataBR(proximoVencimento) }}.
+                  </p>
+                </div>
+              </div>
+
+              <UAlert
+                v-if="vencimentoAntesDaColheita"
+                color="warning"
+                variant="subtle"
+                icon="i-lucide-calendar-clock"
+                title="Janela de iliquidez"
+                :description="`A fatura vence em ${dataBR(proximoVencimento)}, antes de o cliente fechar a comercialização da safra de ${janelaColheita}.`"
+              />
+            </div>
+          </UCard>
+        </div>
+
+        <!-- Imóvel rural: área plantada e regularidade via CAR/SICAR (RF-28).
+             É a área declarada aqui que sustenta a identificação da cultura (RF-24). -->
+        <UCard>
+          <template #header>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="font-semibold">
+                  Imóvel rural (CAR/SICAR)
+                </h2>
+                <p class="text-sm text-muted">
+                  CAR {{ imovel.codigoCAR }} · consultado em {{ dataBR(imovel.consultadoEm) }}
+                </p>
+              </div>
+              <UBadge :color="corSituacaoCAR[imovel.situacaoCAR]" variant="subtle">
+                {{ rotuloSituacaoCAR[imovel.situacaoCAR] }}
+              </UBadge>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-3">
+              <div>
+                <p class="text-sm text-muted">
+                  Área total
+                </p>
+                <p class="font-mono text-xl font-semibold tabular-nums">
+                  {{ ha(imovel.areaTotalHa) }}
+                </p>
+              </div>
+              <div>
+                <p class="text-sm text-muted">
+                  Área em produção
+                </p>
+                <p class="font-mono text-xl font-semibold tabular-nums">
+                  {{ ha(imovel.areaPlantadaHa) }}
+                  <span class="text-sm font-normal text-muted">({{ proporcaoPlantada }}%)</span>
+                </p>
+              </div>
+              <div>
+                <p class="text-sm text-muted">
+                  Reserva legal
+                </p>
+                <p class="font-mono text-xl font-semibold tabular-nums">
+                  {{ ha(imovel.reservaLegalHa) }}
+                </p>
+              </div>
+            </div>
+
+            <UProgress
+              :model-value="proporcaoPlantada"
+              color="primary"
+              size="md"
+              :ui="{ base: 'w-full' }"
+            />
+
+            <p class="text-sm text-muted">
+              {{ ha(imovel.areaPlantadaHa) }} de
+              {{ rotuloCultura[cliente.culturaPredominante].toLowerCase() }} é a base de receita que
+              paga o insumo — os índices climático e de preço acima incidem sobre essa área.
+            </p>
+
+            <UAlert
+              v-if="carIrregular"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-land-plot"
+              title="Cadastro Ambiental Rural irregular"
+              :description="`CAR ${rotuloSituacaoCAR[imovel.situacaoCAR].toLowerCase()}: a área não serve como garantia confiável e o cliente pode ficar impedido de acessar crédito rural até regularizar.`"
+            />
+          </div>
+        </UCard>
+
+        <!-- Matriz de red flags (RF-03) -->
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold">
+              Matriz de red flags
+            </h2>
+          </template>
+
+          <ul v-if="cliente.redFlags.length" class="divide-y divide-default">
+            <li
+              v-for="(flag, i) in cliente.redFlags"
+              :key="i"
+              class="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+            >
+              <UIcon :name="iconeRedFlag[flag.tipo]" class="mt-0.5 size-5 shrink-0 text-muted" />
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium">{{ rotuloRedFlag[flag.tipo] }}</span>
+                  <UBadge :color="corSeveridade[flag.severidade]" variant="subtle" size="sm">
+                    {{ flag.severidade }}
+                  </UBadge>
+                  <UBadge color="neutral" variant="outline" size="sm">
+                    {{ categoriaRedFlag[flag.tipo] }}
+                  </UBadge>
+                </div>
+                <p class="mt-1 text-sm text-muted">
+                  {{ flag.descricao }}
+                </p>
+              </div>
+              <span class="shrink-0 text-xs text-muted">{{ dataBR(flag.detectadoEm) }}</span>
+            </li>
+          </ul>
+
+          <UEmpty
+            v-else
+            icon="i-lucide-shield-check"
+            title="Nenhuma red flag ativa"
+            description="Nenhum sinal jurídico, fiscal, ambiental, técnico, climático ou de commodity detectado."
+          />
+        </UCard>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+          <!-- Evolução do score (RF-08) -->
+          <UCard>
+            <template #header>
+              <div>
+                <h2 class="font-semibold">
+                  Evolução do score
+                </h2>
+                <p class="text-sm text-muted">
+                  Últimos 12 meses
+                </p>
+              </div>
+            </template>
+            <LineChart
+              label="Score"
+              :labels="historico.map(h => dataBR(h.data))"
+              :values="historico.map(h => h.score)"
+            />
+          </UCard>
+
+          <!-- Preço da commodity com janela de safra (RF-30) -->
+          <UCard>
+            <template #header>
+              <div>
+                <h2 class="font-semibold">
+                  Preço do {{ rotuloCultura[commodity.cultura].toLowerCase() }}
+                </h2>
+                <p class="text-sm text-muted">
+                  CEPEA/ESALQ, R$ por {{ unidadeCultura[commodity.cultura] }} · pontos em destaque =
+                  janela de comercialização de {{ janelaColheita }}
+                </p>
+              </div>
+            </template>
+            <LineChart
+              :label="`Preço (${unidadeCultura[commodity.cultura]})`"
+              :labels="mesesPreco"
+              :values="precosCommodity[commodity.cultura]"
+              :destaque-de="4"
+            />
+          </UCard>
+        </div>
+
+        <!-- Relatório LLM (RF-04) -->
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-sparkles" class="size-4 text-primary" />
+              <h2 class="font-semibold">
+                Resumo executivo
+              </h2>
+              <UBadge color="neutral" variant="subtle" size="sm">
+                gerado por LLM
+              </UBadge>
+            </div>
+          </template>
+          <p class="text-sm leading-relaxed text-toned">
+            {{ cliente.relatorioLLM }}
+          </p>
+        </UCard>
+
+        <!-- Histórico de cobrança — seção da Recuperação, exportável em PDF por si só.
+             Crédito não atua na esteira, então não vê este bloco. -->
+        <UCard v-if="perfil !== 'credito'" class="secao-cobranca">
+          <template #header>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="font-semibold">
+                  Histórico de cobrança
+                </h2>
+                <p class="text-sm text-muted">
+                  {{ cobrancas.length }} interação(ões) registrada(s) ·
+                  {{ brl(cliente.valorEmAberto) }} em aberto
+                </p>
+              </div>
+              <UButton
+                icon="i-lucide-file-down"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+                class="print:hidden"
+                @click="imprimir('cobranca')"
+              >
+                Exportar em PDF
+              </UButton>
+            </div>
+          </template>
+
+          <!-- Cabeçalho que só existe no PDF, para o documento se sustentar sozinho. -->
+          <div class="mb-6 hidden border-b border-default pb-4 print:block">
+            <h1 class="text-lg font-semibold">
+              Histórico de cobrança — {{ cliente.razaoSocial }}
+            </h1>
+            <p class="text-sm">
+              CNPJ {{ mascaraCnpj(cliente.cnpj) }} · {{ cliente.municipio }} / {{ cliente.uf }}
+            </p>
+            <p class="text-sm">
+              Saldo em aberto: {{ brl(cliente.valorEmAberto) }} ·
+              Rating atual: {{ cliente.ratingAtual }} ({{ cliente.scoreAtual }}/1000)
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              Emitido em {{ emitidoEm }} · Krill Tech — Esteira de Recuperação
+            </p>
+          </div>
+
+          <div v-if="cobrancas.length" class="overflow-x-auto">
+            <table class="w-full min-w-2xl text-sm">
+              <thead>
+                <tr class="border-b border-default text-left text-xs text-muted">
+                  <th class="py-2 pr-3 font-medium">
+                    Data
+                  </th>
+                  <th class="px-3 py-2 font-medium">
+                    Canal
+                  </th>
+                  <th class="px-3 py-2 font-medium">
+                    Responsável
+                  </th>
+                  <th class="px-3 py-2 font-medium">
+                    Resultado
+                  </th>
+                  <th class="px-3 py-2 text-right font-medium">
+                    Valor
+                  </th>
+                  <th class="py-2 pl-3 font-medium">
+                    Observação
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-default">
+                <tr v-for="(c, i) in cobrancas" :key="i">
+                  <td class="whitespace-nowrap py-2.5 pr-3 font-mono tabular-nums">
+                    {{ dataBR(c.data) }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2.5">
+                    <span class="flex items-center gap-1.5">
+                      <UIcon :name="iconeCanal[c.canal]" class="size-3.5 text-muted" />
+                      {{ rotuloCanal[c.canal] }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2.5">
+                    {{ c.responsavel }}
+                  </td>
+                  <td class="px-3 py-2.5">
+                    <UBadge :color="corResultado[c.resultado]" variant="subtle" size="sm">
+                      {{ rotuloResultado[c.resultado] }}
+                    </UBadge>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums">
+                    {{ c.valor ? brl(c.valor) : '—' }}
+                  </td>
+                  <td class="py-2.5 pl-3 text-muted">
+                    {{ c.observacao }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="totalNegociado">
+                <tr class="border-t border-default">
+                  <td colspan="4" class="py-2.5 pr-3 text-xs text-muted">
+                    Total movimentado nas interações
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2.5 text-right font-mono font-medium tabular-nums">
+                    {{ brl(totalNegociado) }}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <UEmpty
+            v-else
+            variant="naked"
+            icon="i-lucide-handshake"
+            title="Nenhuma cobrança registrada"
+            description="O cliente nunca entrou na esteira de recuperação."
+          />
+        </UCard>
+
+        <!-- Decisão operacional (RF-05, RF-11) — só o Analista de Crédito decide limite.
+             Cobrança chega aqui pela esteira e lê a ficha, mas não aprova. -->
+        <UCard v-if="perfil === 'credito'" class="print:hidden">
+          <template #header>
+            <div>
+              <h2 class="font-semibold">
+                Decisão de crédito de insumo
+              </h2>
+              <p class="text-sm text-muted">
+                Ajuste manual sobre a recomendação do motor — a decisão fica registrada.
+              </p>
+            </div>
+          </template>
+
+          <div class="flex flex-wrap items-end gap-4">
+            <UFormField label="Limite aprovado" class="w-56">
+              <UInputNumber
+                v-model="limite"
+                :step="50000"
+                :min="0"
+                :format-options="{ style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }"
+                class="w-full"
+              />
+            </UFormField>
+
+            <div class="flex-1 text-sm">
+              <p class="text-muted">
+                Condições sugeridas
+              </p>
+              <p>{{ cliente.condicoesPagamentoRecomendadas }}</p>
+            </div>
+
+            <UButton icon="i-lucide-check" @click="registrarDecisao">
+              Registrar decisão
+            </UButton>
+          </div>
+        </UCard>
+      </div>
+    </template>
+  </UDashboardPanel>
+</template>
