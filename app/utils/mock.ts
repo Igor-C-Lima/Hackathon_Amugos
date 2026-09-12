@@ -609,6 +609,77 @@ export const carteira: ClienteDossie[] = [
       consultadoEm: new Date(2026, 0, 8),
     },
   },
+  {
+    // Único cliente com CNPJ real da carteira (SLC Agrícola S.A.) — serve pra
+    // testar o pipeline de coleta real (Receita Federal + Agritec/ZARC) de
+    // ponta a ponta. O resto dos campos abaixo (score, rating, climático,
+    // commodity) segue sintético como os demais, já que o motor de cálculo
+    // (RF-19 a RF-27) ainda não existe.
+    cliente: {
+      cnpj: '89096457000155',
+      razaoSocial: 'SLC Agrícola S.A.',
+      nomeFantasia: 'SLC Agrícola',
+      cnae: '0115-6/00 — Cultivo de soja',
+      municipio: 'Porto Alegre',
+      uf: 'RS',
+      dataAbertura: new Date(1977, 0, 1),
+      capitalSocial: 25_000_000,
+      culturaPredominante: 'soja',
+      garantia: { tipo: 'cpr_fisica', ativo: true },
+      barterAtivo: false,
+      scoreAtual: 915,
+      ratingAtual: 'A',
+      limiteCreditoRecomendado: 8_500_000,
+      condicoesPagamentoRecomendadas: 'Pagamento em 180 dias, liberação integral do limite',
+      valorEmAberto: 4_200_000,
+      redFlags: [],
+      relatorioLLM:
+        'Cliente de risco muito baixo. Grande produtora de soja com operação consolidada e capital robusto. Sem red flags jurídicas, fiscais ou ambientais identificadas. Recomendação: manter limite integral.',
+      criadoEm: new Date(2025, 5, 2),
+      atualizadoEm: new Date(2026, 0, 18),
+    },
+    climatico: {
+      clienteId: '89096457000155',
+      regiao: 'Sul / RS',
+      cultura: 'soja',
+      faseONI: faseONIVigente,
+      quedaProdutividadeHistorica: 4.5,
+      indiceRisco: 18,
+      calculadoEm: new Date(2026, 0, 18),
+    },
+    commodity: {
+      clienteId: '89096457000155',
+      cultura: 'soja',
+      precoAtual: 128.4,
+      variacao6Meses: -8.3,
+      tendencia: 'queda',
+      indiceExposicao: 30,
+      calculadoEm: new Date(2026, 0, 18),
+    },
+    breakdown: {
+      clienteId: '89096457000155',
+      pesoJuridicoFiscal: 50,
+      pesoClimatico: 30,
+      pesoCommodity: 20,
+      scoreFinal: 915,
+      ratingFinal: 'A',
+      calculadoEm: new Date(2026, 0, 18),
+    },
+    historico: historico([905, 910, 908, 915]),
+    janelaColheita: 'mar–abr/2026',
+    fimColheita: new Date(2026, 3, 30),
+    proximoVencimento: new Date(2026, 4, 20),
+    cobrancas: [],
+    imovel: {
+      clienteId: '89096457000155',
+      codigoCAR: 'RS-4314902-B7C2',
+      areaTotalHa: 12_000,
+      areaPlantadaHa: 10_500,
+      reservaLegalHa: 1_500,
+      situacaoCAR: 'ativo',
+      consultadoEm: new Date(2026, 0, 18),
+    },
+  },
 ]
 
 export interface NovoClienteForm {

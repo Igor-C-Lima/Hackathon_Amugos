@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { marked } from 'marked'
+
 // Página 3 — Ficha do Cliente. A mais pesada do MVP:
 // RF-01 a RF-05, RF-08, RF-09, RF-11, RF-12, RF-22, RF-29, RF-30 + regras do glossário (plano §4).
 definePageMeta({ layout: 'gestor' })
@@ -27,6 +29,46 @@ useHead({ title: `${cliente.razaoSocial} — Portal Gestor` })
 
 const toast = useToast()
 const perfil = usePerfil()
+
+const {
+  relatorio,
+  erroRelatorio,
+  carregandoRelatorio,
+  gerarRelatorio,
+} = useAnaliseCliente()
+
+const usarRelatorioMock = ref(true)
+
+const resumoExecutivo = computed(() => relatorio.value || cliente.relatorioLLM)
+const resumoExecutivoHtml = computed(() => marked.parse(resumoExecutivo.value ?? '', { async: false }))
+
+/**
+ * Dados já conhecidos do dossiê sintético, usados como fallback quando o
+ * CNPJ é fictício (carteira mock) e a Receita Federal/DataJud/SICAR reais
+ * não encontram nada. Se o CNPJ for real, o fallback simplesmente não é
+ * usado — os coletores reais têm prioridade.
+ */
+const fallbackSintetico = computed(() => ({
+  receitaFederal: {
+    razaoSocial: cliente.razaoSocial,
+    situacao: 'ATIVA',
+    cnaeDescricao: cliente.cnae,
+    dataAbertura: cliente.dataAbertura.toISOString().slice(0, 10),
+    socios: [] as string[],
+    municipio: cliente.municipio,
+    uf: cliente.uf,
+  },
+  dataJud: {
+    processos: cliente.redFlags
+      .filter(f => f.tipo === 'rj' || f.tipo === 'protesto')
+      .map(f => ({ tipo: rotuloRedFlag[f.tipo], status: f.severidade })),
+  },
+  sicar: {
+    areaHectares: imovel.areaTotalHa,
+    regular: imovel.situacaoCAR === 'ativo',
+    embargos: cliente.redFlags.filter(f => f.tipo === 'embargo_ambiental').length,
+  },
+}))
 
 const emRJ = computed(() => cliente.redFlags.some(f => f.tipo === 'rj'))
 
@@ -476,19 +518,42 @@ function registrarDecisao() {
         <!-- Relatório LLM (RF-04) -->
         <UCard>
           <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-sparkles" class="size-4 text-primary" />
-              <h2 class="font-semibold">
-                Resumo executivo
-              </h2>
-              <UBadge color="neutral" variant="subtle" size="sm">
-                gerado por LLM
-              </UBadge>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-sparkles" class="size-4 text-primary" />
+                <h2 class="font-semibold">
+                  Resumo executivo
+                </h2>
+                <UBadge color="neutral" variant="subtle" size="sm">
+                  {{ relatorio ? 'gerado agora' : 'exemplo' }}
+                </UBadge>
+              </div>
+              <div class="flex items-center gap-3 print:hidden">
+                <USwitch v-model="usarRelatorioMock" label="usar mock" />
+                <UButton
+                  icon="i-lucide-refresh-cw"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                  :loading="carregandoRelatorio"
+                  @click="gerarRelatorio(cliente.cnpj, usarRelatorioMock, fallbackSintetico)"
+                >
+                  Gerar relatório
+                </UButton>
+              </div>
             </div>
           </template>
-          <p class="text-sm leading-relaxed text-toned">
-            {{ cliente.relatorioLLM }}
-          </p>
+
+          <UAlert
+            v-if="erroRelatorio"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="erroRelatorio"
+            class="mb-4"
+          />
+
+          <div class="relatorio-md text-sm text-toned" v-html="resumoExecutivoHtml" />
         </UCard>
 
         <!-- Histórico de cobrança — seção da Recuperação, exportável em PDF por si só.
@@ -650,3 +715,106 @@ function registrarDecisao() {
     </template>
   </UDashboardPanel>
 </template>
+
+<style scoped>
+/*
+ * v-html injeta HTML fora do compilador do Vue, então o CSS "scoped" normal
+ * não alcança esses elementos — por isso :deep() em cada seletor. Cores e
+ * espaçamento seguem os tokens do Field Ledger (app.vue/main.css), não
+ * valores soltos, pra o relatório do LLM combinar com o resto da ficha.
+ */
+.relatorio-md :deep(h1),
+.relatorio-md :deep(h2),
+.relatorio-md :deep(h3) {
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  color: var(--ui-text-highlighted);
+}
+
+.relatorio-md :deep(h1:first-child),
+.relatorio-md :deep(h2:first-child),
+.relatorio-md :deep(h3:first-child) {
+  margin-top: 0;
+}
+
+.relatorio-md :deep(h1) {
+  font-size: 1.125rem;
+}
+
+.relatorio-md :deep(h2) {
+  font-size: 1.0625rem;
+}
+
+.relatorio-md :deep(h3) {
+  font-size: 1rem;
+}
+
+.relatorio-md :deep(p) {
+  margin-bottom: 0.85em;
+  line-height: 1.6;
+}
+
+.relatorio-md :deep(strong) {
+  font-weight: 600;
+  color: var(--ui-text-highlighted);
+}
+
+.relatorio-md :deep(ul),
+.relatorio-md :deep(ol) {
+  margin-bottom: 0.85em;
+  padding-left: 1.25rem;
+}
+
+.relatorio-md :deep(li) {
+  margin-bottom: 0.3em;
+  line-height: 1.5;
+}
+
+.relatorio-md :deep(li > ul),
+.relatorio-md :deep(li > ol) {
+  margin-top: 0.3em;
+  margin-bottom: 0;
+}
+
+.relatorio-md :deep(blockquote) {
+  margin: 0.85em 0;
+  border-left: 3px solid var(--ui-primary);
+  padding-left: 0.85rem;
+  color: var(--ui-text-muted);
+}
+
+.relatorio-md :deep(hr) {
+  margin: 1.25em 0;
+  border: none;
+  border-top: 1px solid var(--ui-border);
+}
+
+.relatorio-md :deep(code) {
+  border-radius: var(--ui-radius);
+  background: var(--ui-bg-muted);
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+}
+
+.relatorio-md :deep(table) {
+  width: 100%;
+  margin-bottom: 0.85em;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.relatorio-md :deep(th),
+.relatorio-md :deep(td) {
+  border: 1px solid var(--ui-border);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.relatorio-md :deep(th) {
+  background: var(--ui-bg-muted);
+  font-weight: 600;
+  color: var(--ui-text-highlighted);
+}
+</style>
