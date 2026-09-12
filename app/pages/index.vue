@@ -101,37 +101,36 @@ const etapas = [
       </header>
 
       <main class="hero">
-        <p class="sobrancelha">
-          Prevenção à inadimplência no crédito de insumo
-        </p>
+        <div class="hero-texto">
+          <h1 class="titulo entrada" style="--atraso: 0s">
+            O risco da safra, lido antes da colheita.
+          </h1>
 
-        <h1 class="titulo">
-          O risco da safra, lido antes da colheita.
-        </h1>
+          <p class="chamada entrada" style="--atraso: 0.1s">
+            O pagamento do fornecedor de insumo não depende da saúde financeira do produtor — depende da
+            safra que ele ainda vai colher e vender. O SafraScore monitora os dois sinais que decidem
+            isso, clima e preço da commodity, e transforma em score, red flag e recomendação de limite
+            antes do vencimento.
+          </p>
 
-        <p class="chamada">
-          O pagamento do fornecedor de insumo não depende da saúde financeira do produtor — depende da
-          safra que ele ainda vai colher e vender. O SafraScore monitora os dois sinais que decidem
-          isso, clima e preço da commodity, e transforma em score, red flag e recomendação de limite
-          antes do vencimento.
-        </p>
-
-        <div class="acoes">
-          <NuxtLink to="/entrar" class="botao botao-solido">
-            Portal do analista
-          </NuxtLink>
-          <NuxtLink to="/contratante" class="botao botao-vazado">
-            Portal do contratante
-          </NuxtLink>
+          <div class="acoes entrada" style="--atraso: 0.2s">
+            <NuxtLink to="/entrar" class="botao botao-solido">
+              Portal do analista
+            </NuxtLink>
+            <NuxtLink to="/contratante" class="botao botao-vazado">
+              Portal do contratante
+            </NuxtLink>
+          </div>
         </div>
+
+        <!-- Decorativa: o texto já diz tudo o que a foto mostra. Fundo só existe a partir do
+             breakpoint em que a coluna aparece, então o mobile nunca baixa esse arquivo. -->
+        <div class="hero-foto entrada" style="--atraso: 0.3s" aria-hidden="true" />
       </main>
     </div>
 
     <section class="secao">
       <div class="limite">
-        <p class="sobrancelha">
-          Dois sinais
-        </p>
         <h2 class="titulo-secao">
           O que decide se o cliente paga não está no balanço dele.
         </h2>
@@ -150,9 +149,6 @@ const etapas = [
 
     <section class="secao secao-alt">
       <div class="limite">
-        <p class="sobrancelha">
-          Como funciona
-        </p>
         <h2 class="titulo-secao">
           Da base pública ao alerta, antes da fatura vencer.
         </h2>
@@ -239,9 +235,10 @@ const etapas = [
 
 .faixa {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
   padding-block: 0.9rem;
 }
 
@@ -285,7 +282,16 @@ const etapas = [
   border-radius: 3px;
   font-weight: 700;
   font-size: 0.95rem;
+  white-space: nowrap;
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.botao:focus-visible,
+.link:focus-visible,
+.marca:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 
 .botao-solido {
@@ -308,27 +314,29 @@ const etapas = [
 
 .hero {
   position: relative;
+  display: grid;
+  gap: 3rem;
   margin-inline: auto;
   width: 100%;
   max-width: 78rem;
   padding: 7rem 1.5rem 8rem;
 }
 
-.sobrancelha {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--verde);
+.hero-texto {
+  min-width: 0;
+}
+
+.hero-foto {
+  display: none;
 }
 
 .titulo {
-  margin-top: 1.6rem;
   max-width: 15ch;
   font-size: clamp(2.75rem, 7.5vw, 5.25rem);
   font-weight: 700;
   line-height: 1.02;
   letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 
 .chamada {
@@ -356,12 +364,12 @@ const etapas = [
 }
 
 .titulo-secao {
-  margin-top: 1rem;
   max-width: 24ch;
   font-size: clamp(1.8rem, 3.4vw, 2.6rem);
   font-weight: 700;
   line-height: 1.12;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 .sinais {
@@ -451,5 +459,52 @@ const etapas = [
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 2rem;
   }
+}
+
+/* A coluna de foto só existe a partir daqui — abaixo disso o navegador nunca a baixa. */
+@media (min-width: 64rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: center;
+  }
+
+  .hero-foto {
+    display: block;
+    aspect-ratio: 3 / 4;
+    border: 1px solid var(--borda);
+    background: center / cover no-repeat url('/images/hero-lavoura.jpg');
+  }
+}
+
+/* Abaixo de ~416px o link secundário não cabe ao lado do botão sem quebrar a palavra
+   dentro dele — some daqui; a mesma rota já está no par de botões logo abaixo do hero. */
+@media (max-width: 26rem) {
+  .navegacao .link {
+    display: none;
+  }
+}
+
+/* Único momento de movimento autoral da página: o hero assenta ao carregar. */
+.entrada {
+  animation: assentar 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--atraso, 0s);
+}
+
+@keyframes assentar {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entrada {
+    animation: none;
+  }
+}
+
+.safrascore ::selection {
+  background: var(--verde);
+  color: #fff;
 }
 </style>

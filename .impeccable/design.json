@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T12:00:00.000Z",
+  "title": "Design System: SafraScore",
+  "extensions": {
+    "colorMeta": {
+      "field-green": {
+        "role": "primary",
+        "displayName": "Field Green",
+        "canonical": "#2d6a3f",
+        "tonalRamp": ["#173620", "#2b643c", "#3d8f55", "#53b670", "#7ec894", "#a5d9b5", "#cdead5", "#edf7f0"]
+      },
+      "field-green-deep": {
+        "role": "primary",
+        "displayName": "Field Green Deep",
+        "canonical": "#234f30",
+        "tonalRamp": ["#173520", "#2c633c", "#3f8d56", "#55b471", "#80c795", "#a7d8b5", "#cee9d6", "#edf7f0"]
+      },
+      "deep-ink-green": {
+        "role": "neutral",
+        "displayName": "Deep Ink Green",
+        "canonical": "#1b2a1a",
+        "tonalRamp": ["#1e2f1d", "#395837", "#517e4e", "#6ba168", "#90b98e", "#b2ceb0", "#d4e4d3", "#f0f5ef"]
+      },
+      "soft-ink": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "#3c4a39",
+        "tonalRamp": ["#232b21", "#41513e", "#5d7359", "#7a9475", "#9baf97", "#bac8b7", "#d8e0d7", "#f1f4f1"]
+      },
+      "paper-cream": {
+        "role": "neutral",
+        "displayName": "Paper Cream",
+        "canonical": "#f5f3ea",
+        "tonalRamp": ["#342f19", "#61582e", "#8a7d42", "#b0a059", "#c4b883", "#d6cea9", "#e8e3cf", "#f7f5ee"]
+      },
+      "warm-husk": {
+        "role": "neutral",
+        "displayName": "Warm Husk",
+        "canonical": "#efece1",
+        "tonalRamp": ["#322d1b", "#5d5432", "#857847", "#aa9a5f", "#bfb387", "#d3caac", "#e6e2d0", "#f6f4ee"]
+      },
+      "ink-hairline": {
+        "role": "neutral",
+        "displayName": "Ink Hairline",
+        "canonical": "rgba(27, 42, 26, 0.14)"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headline only, one per page." },
+      "headline": { "displayName": "Headline", "purpose": "Section h2 headings." },
+      "title": { "displayName": "Title", "purpose": "Sub-section h3 headings inside a section (signal cards, step list)." },
+      "body": { "displayName": "Body", "purpose": "Supporting paragraphs; hero lede is a larger one-off variant." },
+      "label": { "displayName": "Label", "purpose": "Step numbers and nav/CTA microcopy; tracked and bold." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "assentar", "value": "opacity 0->1, translateY(0.75rem)->0, 0.6s cubic-bezier(0.16,1,0.3,1)", "purpose": "Single authored entrance for the hero (heading, lede, actions, photo) staggered 0/0.1/0.2/0.3s. Respects prefers-reduced-motion. Not reused on scroll or on other sections." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "26rem", "purpose": "Below this the secondary nav link is dropped instead of wrapped." },
+      { "name": "md", "value": "48rem", "purpose": "Two-column signal grid and four-column step grid turn on." },
+      { "name": "lg", "value": "64rem", "purpose": "Hero splits into text + photo columns; the photo asset is only fetched at/above this width." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid Field Green CTA — the only solid-fill control in the system.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Portal do analista</a>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; padding: 0.72rem 1.4rem; border-radius: 3px; font-weight: 700; font-size: 0.95rem; white-space: nowrap; color: #ffffff; background: #2d6a3f; text-decoration: none; transition: background-color 0.15s; } .ds-btn-primary:hover { background: #234f30; } .ds-btn-primary:focus-visible { outline: 2px solid #2d6a3f; outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Hairline-bordered, transparent-fill CTA — always paired next to a primary button, never alone.",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">Portal do contratante</a>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; padding: 0.72rem 1.4rem; border-radius: 3px; font-weight: 700; font-size: 0.95rem; white-space: nowrap; color: #1b2a1a; background: transparent; border: 1px solid rgba(27,42,26,0.14); text-decoration: none; transition: border-color 0.15s; } .ds-btn-secondary:hover { border-color: #1b2a1a; } .ds-btn-secondary:focus-visible { outline: 2px solid #2d6a3f; outline-offset: 3px; }"
+    },
+    {
+      "name": "Text Link",
+      "kind": "custom",
+      "refersTo": "link",
+      "description": "Bold, tracked, Field Green nav/inline link. Color change only on hover, no underline.",
+      "html": "<a class=\"ds-link\" href=\"#\">Sou contratante</a>",
+      "css": ".ds-link { font-weight: 600; color: #2d6a3f; text-decoration: none; } .ds-link:hover { color: #234f30; } .ds-link:focus-visible { outline: 2px solid #2d6a3f; outline-offset: 3px; border-radius: 3px; }"
+    },
+    {
+      "name": "Section Heading Pair",
+      "kind": "custom",
+      "refersTo": "headline",
+      "description": "The headline + title pairing that opens every content section — no eyebrow label above it, ever.",
+      "html": "<div class=\"ds-heading-pair\"><h2 class=\"ds-headline\">O que decide se o cliente paga não está no balanço dele.</h2></div>",
+      "css": ".ds-headline { max-width: 24ch; font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; color: #1b2a1a; text-wrap: balance; margin: 0; }"
+    },
+    {
+      "name": "Step Label",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Numbered process-step marker, sits above a title + hairline rule.",
+      "html": "<li class=\"ds-step\"><span class=\"ds-step-number\">01</span><h3 class=\"ds-step-title\">Coleta</h3><p class=\"ds-step-text\">Dados cadastrais, jurídicos e fiscais das bases públicas.</p></li>",
+      "css": ".ds-step { list-style: none; } .ds-step-number { display: block; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; color: #2d6a3f; } .ds-step-title { margin-top: 0.6rem; padding-top: 0.9rem; border-top: 1px solid rgba(27,42,26,0.14); font-size: 1.1rem; font-weight: 700; color: #1b2a1a; } .ds-step-text { margin-top: 0.45rem; line-height: 1.65; color: #3c4a39; }"
+    },
+    {
+      "name": "Photo Panel",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Signature component: a 3:4 real photograph, hairline-bordered, no radius, no shadow. Only rendered/fetched at the lg breakpoint.",
+      "html": "<div class=\"ds-photo-panel\" role=\"img\" aria-label=\"\"></div>",
+      "css": ".ds-photo-panel { aspect-ratio: 3 / 4; border: 1px solid rgba(27,42,26,0.14); background: center / cover no-repeat url('/images/hero-lavoura.jpg'); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Ledger",
+    "overview": "SafraScore reads two things a balance sheet can't show — whether the safra will exist, and whether it will be worth enough — and turns them into a score a credit analyst can act on before the harvest. The visual system carries that same discipline: a ledger, not a dashboard. Paper-toned ground, ink-dark type, hairline rules instead of cards or shadows, one accent color used sparingly for action and evidence. Where the product needs to prove it understands the actual crop, it says so with a real aerial photograph, not an icon — the plantation grid rendered first in abstract line-work behind the hero, then made literal in the photo beside it.\n\nThe system rejects the two easy defaults for an agro product: it is not a saturated \"green tech\" palette selling optimism, and it is not a generic SaaS gradient-and-card template. It is closer to a well-kept paper ledger crossed with an aerial survey map — legible, unhurried, confident enough to leave most of the page empty.",
+    "keyCharacteristics": [
+      "Paper-cream ground with ink-dark text; no white, no pure black, anywhere.",
+      "Flat by construction — zero shadows, all separation from hairline borders or a shift in paper tone.",
+      "One system font (the platform's own), carrying the entire hierarchy through size, weight, and tracking alone.",
+      "A single accent (Field Green) spent only on the action a visitor should take and the evidence behind a claim.",
+      "Real aerial photography as a second, literal register beneath the abstract line-grid motif — never both competing for the same space."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Field Green is the only saturated color in the system. If a second accent seems needed, the answer is almost always weight, size, or a hairline — not a new hue.", "section": "colors" },
+      { "name": "The No-Eyebrow Rule", "body": "No small-caps label sits above a heading to announce its topic. Every heading carries its own meaning; a kicker is a crutch this system doesn't use.", "section": "typography" },
+      { "name": "The Flat Ledger Rule", "body": "No surface ever lifts, glows, or casts a shadow. If two things need visual separation, draw a hairline between them or change the paper tone — do not add depth.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Paper Cream as a fixed, light-only background on this surface — it is a deliberate brand decision (see PRODUCT.md), not an oversight that it ignores system dark mode.",
+      "Do derive every border/divider from Deep Ink Green at low opacity (rgba(27, 42, 26, 0.14)), never an unrelated gray.",
+      "Do gate any large decorative asset (photo, illustration) behind the media query at the breakpoint where it appears, so narrower viewports never fetch it.",
+      "Do balance display and headline text (text-wrap: balance) and cap their measure (~15ch / ~24ch) so they never run past two or three confident lines.",
+      "Do theme focus rings, text selection, and hover states from the palette (Field Green) — never leave a browser default unstyled."
+    ],
+    "donts": [
+      "Don't add a shadow, glow, or lift to any surface. Depth is a hairline or a paper-tone shift, always.",
+      "Don't put a small-caps label above a heading. The heading carries its own weight.",
+      "Don't introduce a second accent hue. If Field Green feels insufficient, the fix is weight, size, or a hairline.",
+      "Don't round a corner past 3px, except the circular brand mark.",
+      "Don't let a button's label wrap — fix the width or drop a sibling element before letting text break inside a control."
+    ]
+  }
+}
