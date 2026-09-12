@@ -22,6 +22,28 @@ h1, h2, h3 {
   text-wrap: balance;
 }
 
+/*
+ * Trama de pontos da landing, estendida pro portal inteiro — pedido explícito: as telas
+ * têm o mesmo fundo da landing. Fica no <body>: o corpo da UDashboardPanel não tem fundo
+ * opaco próprio, então o ponto aparece atrás de tudo — inclusive de número de tabela densa
+ * (verificado ao vivo). Por isso a opacidade é bem mais baixa que a da landing (0.06 vs
+ * 0.13): ali é 3 segundos de chegada, aqui é o fundo o dia inteiro de quem trabalha na tela.
+ */
+body {
+  background-color: var(--ui-bg);
+  background-image: radial-gradient(rgba(27, 42, 26, 0.06) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/*
+ * Contêiner para o <GridTalhao /> nas telas de chegada (login) — a trama de pontos já
+ * vem do <body>; isto só recorta as linhas de plantio, que são maiores que a tela.
+ */
+.campo-fundo {
+  position: relative;
+  overflow: hidden;
+}
+
 /* RF-12: exportação em PDF usa o diálogo de impressão do navegador. */
 @media print {
   /* Painéis do dashboard rolam internamente; na impressão precisam fluir por todas as páginas. */

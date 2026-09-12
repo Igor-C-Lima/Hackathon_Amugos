@@ -131,13 +131,10 @@ function registrarDecisao() {
         <!-- Os quatro números que decidem o crédito -->
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <UPageCard
-            icon="i-lucide-gauge"
             title="Score consolidado"
             :description="`Rating ${cliente.ratingAtual} · atualizado em ${dataBR(cliente.atualizadoEm)}`"
           >
-            <p class="font-mono text-3xl font-semibold tabular-nums">
-              {{ cliente.scoreAtual }}
-            </p>
+            <MedidorScore :score="cliente.scoreAtual" :rating="cliente.ratingAtual" :tamanho="104" />
           </UPageCard>
 
           <UPageCard
