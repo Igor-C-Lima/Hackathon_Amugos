@@ -8,6 +8,34 @@ useHead({ title: 'Minha situação — Portal do Contratante' })
 
 const contratante = useContratante()
 const { dossie, pending } = useDossie(contratante)
+const listaClientes = useListaClientes()
+
+const alvoRating = computed(() =>
+  dossie.value ? proximaFaixaRating(dossie.value.cliente.scoreAtual) : null,
+)
+
+/**
+ * RF-12 (roadmap, DEVELOPMENT_PLAN.md) trazido pro MVP como leitura de progresso, não
+ * ranking: média anônima de score entre pares da mesma cultura, nunca lista de concorrente
+ * identificado (GAMIFICACAO.md). Cohort prioriza mesma UF; cai pra Brasil todo se a UF tiver
+ * poucos pares — datasets pequenos (hackathon) raramente têm 2+ pares no mesmo estado.
+ */
+const benchmark = computed(() => {
+  if (!dossie.value) return null
+  const { cnpj, culturaPredominante, uf } = dossie.value.cliente
+  const mesmaCultura = listaClientes.data.value?.filter(
+    c => c.cnpj !== cnpj && c.culturaPredominante === culturaPredominante,
+  ) ?? []
+  const mesmaRegiao = mesmaCultura.filter(c => c.uf === uf)
+  const pares = mesmaRegiao.length >= 2 ? mesmaRegiao : mesmaCultura
+  if (pares.length < 1) return null
+
+  const media = pares.reduce((soma, c) => soma + c.scoreAtual, 0) / pares.length
+  return {
+    regional: pares === mesmaRegiao,
+    diferenca: Math.round(dossie.value.cliente.scoreAtual - media),
+  }
+})
 
 watch([pending, dossie], ([carregando, d]) => {
   if (!carregando && !d) navigateTo('/contratante')
@@ -73,12 +101,27 @@ function sair() {
         <div class="flex flex-wrap items-center gap-6">
           <MedidorScore :score="dossie.cliente.scoreAtual" :rating="dossie.cliente.ratingAtual" :tamanho="140" />
           <div class="min-w-0 flex-1 space-y-2">
-            <UBadge :color="corRating[dossie.cliente.ratingAtual]" variant="subtle" size="lg">
-              Classificação {{ dossie.cliente.ratingAtual }}
-            </UBadge>
+            <div class="flex flex-wrap items-center gap-2">
+              <UBadge :color="corRating[dossie.cliente.ratingAtual]" variant="subtle" size="lg">
+                Classificação {{ dossie.cliente.ratingAtual }}
+              </UBadge>
+              <!-- Selo de reforço: só nas faixas altas, nunca recompensa vazia (GAMIFICACAO.md) -->
+              <UBadge v-if="dossie.cliente.ratingAtual === 'A'" color="success" variant="soft" icon="i-lucide-award">
+                Nota máxima
+              </UBadge>
+            </div>
             <p class="text-sm text-toned">
               {{ explicacaoRating[dossie.cliente.ratingAtual] }}
             </p>
+
+            <!-- RF-14: alvo de progresso em vez de só o número -->
+            <div v-if="alvoRating" class="space-y-1 pt-1">
+              <p class="text-xs text-muted">
+                Faltam <span class="font-mono font-semibold text-highlighted">{{ alvoRating.faltam }} pontos</span>
+                para o rating {{ alvoRating.rating }}
+              </p>
+              <UProgress :model-value="dossie.cliente.scoreAtual" :max="1000" :color="corRating[dossie.cliente.ratingAtual]" size="sm" />
+            </div>
           </div>
         </div>
 
@@ -146,6 +189,16 @@ function sair() {
           </div>
         </div>
       </UCard>
+
+      <!-- RF-12 (roadmap): benchmark anônimo de pares, sem expor concorrente identificado -->
+      <UAlert
+        v-if="benchmark && benchmark.diferenca !== 0"
+        :icon="benchmark.diferenca > 0 ? 'i-lucide-trending-up' : 'i-lucide-users'"
+        :color="benchmark.diferenca > 0 ? 'success' : 'neutral'"
+        variant="subtle"
+        :title="benchmark.diferenca > 0 ? 'Acima da média' : 'Abaixo da média'"
+        :description="`Seu score está ${Math.abs(benchmark.diferenca)} pontos ${benchmark.diferenca > 0 ? 'acima' : 'abaixo'} da média de produtores de ${rotuloCultura[dossie.cliente.culturaPredominante].toLowerCase()} ${benchmark.regional ? 'na sua região' : 'na carteira'}.`"
+      />
 
       <!-- RF-17: alerta preventivo de clima e preço -->
       <UAlert
