@@ -26,5 +26,5 @@ logs
 .env.*
 !.env.example
 
-# Firebase
-.firebase/
+# Vercel
+.vercel
