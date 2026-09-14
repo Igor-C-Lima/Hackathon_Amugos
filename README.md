@@ -122,5 +122,6 @@ Projeto desenvolvido em equipe para o Hackathon PMI-DF 2026:
 
 - **Amanda de Oliveira Weiler** ([@interludeebloom](https://github.com/interludeebloom))
 - **Élvis Corrêa Miranda Júnior** ([@neatzzy](https://github.com/neatzzy))
+- **Pedro Sarmento** ([@Betoesu](https://github.com/Betoesu))
 - **Igor Lima** ([@Igor-C-Lima](https://github.com/Igor-C-Lima))
 - **Gustavo Alves Dias** ([@gusfring41](https://github.com/gusfring41))
